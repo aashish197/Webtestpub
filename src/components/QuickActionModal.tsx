@@ -1174,13 +1174,34 @@ export const QuickActionModal: React.FC = () => {
                         </div>
 
                         <div>
-                          <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                            Duration (Mins)
-                          </label>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                              Duration (Mins)
+                            </label>
+                            <div className="flex items-center gap-1">
+                              {[35, 40, 45, 50, 60, 90].map((d) => (
+                                <button
+                                  key={d}
+                                  type="button"
+                                  onClick={() => {
+                                    const newEnd = calculateEndTime(classData.startTime, d);
+                                    setClassData({ ...classData, durationMinutes: d, endTime: newEnd });
+                                  }}
+                                  className={`px-1.5 py-0.5 text-[9px] font-medium rounded transition ${
+                                    classData.durationMinutes === d
+                                      ? 'bg-indigo-600 text-white font-bold'
+                                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                                  }`}
+                                >
+                                  {d}m
+                                </button>
+                              ))}
+                            </div>
+                          </div>
                           <input
                             type="number"
-                            min="15"
-                            step="5"
+                            min="5"
+                            step="1"
                             value={classData.durationMinutes}
                             onChange={(e) => {
                               const dur = Number(e.target.value) || 60;
@@ -1674,8 +1695,8 @@ export const QuickActionModal: React.FC = () => {
                           </label>
                           <input
                             type="number"
-                            min="15"
-                            step="5"
+                            min="5"
+                            step="1"
                             value={institutionData.periodDurationMinutes}
                             onChange={(e) =>
                               setInstitutionData({
@@ -1696,8 +1717,8 @@ export const QuickActionModal: React.FC = () => {
                           <span>Period Length:</span>
                           <input
                             type="number"
-                            min="15"
-                            step="5"
+                            min="5"
+                            step="1"
                             value={institutionData.periodDurationMinutes}
                             onChange={(e) =>
                               setInstitutionData({

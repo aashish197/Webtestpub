@@ -59,7 +59,7 @@ export function calculateDurationMinutes(startTime: string, endTime: string): nu
   if (endMins < startMins) {
     endMins += 24 * 60; // next day / overnight
   }
-  return Math.max(15, endMins - startMins);
+  return Math.max(5, endMins - startMins);
 }
 
 /**
