@@ -1,0 +1,6 @@
+{
+  "name": "Teacher Class & Tuition Manager",
+  "description": "A personal teaching management assistant for home tuitions, college classes, schedules, attendance, payments, salaries, and student performance with AD/BS date support.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

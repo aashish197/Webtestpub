@@ -1,0 +1,76 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile and teacher preferences",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "settings": { "type": "object" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["email"]
+    },
+    "Student": {
+      "title": "Student",
+      "description": "Student record managed by teacher",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "grade": { "type": "string" },
+        "schoolOrCollege": { "type": "string" },
+        "contactNumber": { "type": "string" },
+        "parentContact": { "type": "string" },
+        "subjects": { "type": "array", "items": { "type": "string" } },
+        "feeAmount": { "type": "number" },
+        "status": { "type": "string" }
+      },
+      "required": ["userId", "name"]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "Payment records for tuition or college salary",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "targetName": { "type": "string" },
+        "amountPaid": { "type": "number" },
+        "paymentDate": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["userId", "amountPaid", "paymentDate"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "entity": "UserProfile",
+      "description": "Teacher profile and settings"
+    },
+    "/users/{userId}/students/{studentId}": {
+      "entity": "Student",
+      "description": "User's students"
+    },
+    "/users/{userId}/institutions/{institutionId}": {
+      "description": "User's colleges/institutions"
+    },
+    "/users/{userId}/classes/{classId}": {
+      "description": "User's routine classes"
+    },
+    "/users/{userId}/payments/{paymentId}": {
+      "entity": "Payment",
+      "description": "User's payments"
+    },
+    "/users/{userId}/attendance/{attendanceId}": {
+      "description": "User's attendance logs"
+    },
+    "/users/{userId}/performance/{performanceId}": {
+      "description": "User's test results"
+    },
+    "/users/{userId}/notifications/{notificationId}": {
+      "description": "User's notifications"
+    }
+  }
+}
