@@ -29,6 +29,9 @@ import {
   auth,
   db,
   signInWithGoogle,
+  signUpWithEmail,
+  signInWithEmail,
+  resetPassword,
   signOutUser,
   onAuthStateChanged,
   User as FirebaseUser,
@@ -78,6 +81,9 @@ interface AppContextType {
   isSyncing: boolean;
   syncStatus: 'idle' | 'syncing' | 'synced' | 'error';
   loginWithGoogle: () => Promise<void>;
+  loginWithEmail: (email: string, password: string) => Promise<void>;
+  signupWithEmail: (email: string, password: string, displayName?: string) => Promise<void>;
+  sendPasswordReset: (email: string) => Promise<void>;
   logout: () => Promise<void>;
   syncDataToCloud: () => Promise<void>;
 
@@ -442,10 +448,45 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       await signInWithGoogle();
       setIsAuthModalOpen(false);
     } catch (err) {
-      console.error('Login failed:', err);
+      console.error('Google login failed:', err);
       throw err;
     } finally {
       setIsAuthLoading(false);
+    }
+  };
+
+  const loginWithEmail = async (email: string, password: string) => {
+    try {
+      setIsAuthLoading(true);
+      await signInWithEmail(email, password);
+      setIsAuthModalOpen(false);
+    } catch (err) {
+      console.error('Email login failed:', err);
+      throw err;
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  const signupWithEmail = async (email: string, password: string, displayName?: string) => {
+    try {
+      setIsAuthLoading(true);
+      await signUpWithEmail(email, password, displayName);
+      setIsAuthModalOpen(false);
+    } catch (err) {
+      console.error('Email signup failed:', err);
+      throw err;
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  const sendPasswordReset = async (email: string) => {
+    try {
+      await resetPassword(email);
+    } catch (err) {
+      console.error('Password reset failed:', err);
+      throw err;
     }
   };
 
@@ -1233,6 +1274,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         isSyncing,
         syncStatus,
         loginWithGoogle,
+        loginWithEmail,
+        signupWithEmail,
+        sendPasswordReset,
         logout,
         syncDataToCloud,
 
