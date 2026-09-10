@@ -143,7 +143,7 @@ export const StudentsView: React.FC = () => {
       subjects: [...student.subjects],
       tuitionType: student.tuitionType,
       groupName: student.groupName || '',
-      startDate: student.startDate,
+      startDate: student.startDate || getTodayIso(),
       classFrequency: student.classFrequency,
       classDurationMinutes: student.classDurationMinutes,
       feeStructure: student.feeStructure,
@@ -649,8 +649,8 @@ export const StudentsView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Row 2: School & Tuition Type */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Row 2: School, Tuition Type & Starting Date */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     School / College Name
@@ -680,6 +680,27 @@ export const StudentsView: React.FC = () => {
                     <option value="individual">Individual (1-on-1 Tuition)</option>
                     <option value="group">Group Tuition (Batch)</option>
                   </select>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5 text-indigo-500" />
+                      Starting Date *
+                    </label>
+                    {formData.startDate && (
+                      <span className="text-[10px] font-medium text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/60 px-1.5 py-0.5 rounded border border-teal-200/50 dark:border-teal-900/50">
+                        {formatDisplayDate(formData.startDate, settings.calendarMode || settings.dateSystem)}
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="date"
+                    required
+                    value={formData.startDate}
+                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  />
                 </div>
               </div>
 
@@ -1108,7 +1129,17 @@ export const StudentsView: React.FC = () => {
               {/* Drawer Content */}
               <div className="flex-1 overflow-y-auto p-5 space-y-6 text-xs">
                 {/* Academic & Contact Info */}
-                <div className="grid grid-cols-2 gap-3 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400">
+                      Starting Date
+                    </span>
+                    <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5 flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+                      {formatDisplayDate(selectedStudentForDrawer.startDate, settings.calendarMode)}
+                    </p>
+                  </div>
+
                   <div>
                     <span className="text-[10px] uppercase font-bold text-slate-400">
                       Parent / Guardian
@@ -1128,7 +1159,7 @@ export const StudentsView: React.FC = () => {
                     </p>
                   </div>
 
-                  <div className="col-span-2 border-t border-slate-200/60 dark:border-slate-700/60 pt-2">
+                  <div className="col-span-2 sm:col-span-3 border-t border-slate-200/60 dark:border-slate-700/60 pt-2">
                     <span className="text-[10px] uppercase font-bold text-slate-400">
                       Address / Location
                     </span>

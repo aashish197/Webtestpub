@@ -696,11 +696,20 @@ export const QuickActionModal: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Class Start Date ({settings.dateSystem})
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5 text-indigo-500" />
+                      Class Start Date *
+                    </label>
+                    {studentData.startDate && (
+                      <span className="text-[10px] font-medium text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/60 px-1.5 py-0.5 rounded border border-teal-200/50 dark:border-teal-900/50">
+                        {formatDisplayDate(studentData.startDate, settings.calendarMode || settings.dateSystem)}
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="date"
+                    required
                     value={studentData.startDate}
                     onChange={(e) => setStudentData({ ...studentData, startDate: e.target.value })}
                     className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"

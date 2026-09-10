@@ -575,6 +575,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const addStudent = (studentData: Omit<Student, 'id' | 'createdAt'>): Student => {
     const newStudent: Student = {
       ...studentData,
+      startDate: studentData.startDate || getTodayIso(),
       id: `std-${Date.now()}`,
       createdAt: new Date().toISOString(),
     };
