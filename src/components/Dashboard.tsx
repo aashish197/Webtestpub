@@ -22,6 +22,8 @@ import {
   BookOpen,
   Coffee,
   Sliders,
+  Send,
+  ExternalLink,
 } from 'lucide-react';
 import { formatCurrency, formatTime, generatePaymentReminderText, calculateGrade } from '../utils/formatters';
 import { formatDisplayDate, getTodayIso } from '../utils/nepaliCalendar';
@@ -50,11 +52,46 @@ export const Dashboard: React.FC = () => {
   } = useApp();
 
   const [copiedPayId, setCopiedPayId] = useState<string | null>(null);
+  const [batchSuccessMsg, setBatchSuccessMsg] = useState<string | null>(null);
   const todayIso = getTodayIso();
 
   // Check today's marked attendance status for each class
   const getTodayAttendanceForClass = (classId: string) => {
     return attendance.find((a) => a.classId === classId && a.date === todayIso);
+  };
+
+  // Helper for live class timing status
+  const getClassLiveStatus = (startTime: string, endTime: string) => {
+    try {
+      const now = new Date();
+      const currentMins = now.getHours() * 60 + now.getMinutes();
+      const [sh, sm] = startTime.split(':').map(Number);
+      const [eh, em] = endTime.split(':').map(Number);
+      const startMins = sh * 60 + (sm || 0);
+      const endMins = eh * 60 + (em || 0);
+
+      if (currentMins >= startMins && currentMins <= endMins) {
+        return {
+          label: 'Live Now',
+          badgeClass: 'bg-emerald-500 text-white font-bold animate-pulse',
+        };
+      }
+      if (currentMins < startMins && startMins - currentMins <= 60) {
+        return {
+          label: `In ${startMins - currentMins}m`,
+          badgeClass: 'bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 font-semibold',
+        };
+      }
+      if (currentMins > endMins) {
+        return {
+          label: 'Ended',
+          badgeClass: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 font-medium',
+        };
+      }
+    } catch {
+      // ignore
+    }
+    return null;
   };
 
   const handleQuickMarkAttendance = (
@@ -96,6 +133,50 @@ export const Dashboard: React.FC = () => {
     }
   };
 
+  // Batch Mark All Unmarked Classes as Present
+  const unmarkedTodayClasses = todayClasses.filter(
+    (cls) => !getTodayAttendanceForClass(cls.id)
+  );
+
+  const handleMarkAllPresent = () => {
+    unmarkedTodayClasses.forEach((cls) => {
+      let targetName = cls.title;
+      if (cls.type === 'home_tuition') {
+        const student = students.find((s) => s.id === cls.studentId);
+        if (student) targetName = student.name;
+        if (cls.groupName) targetName = cls.groupName;
+      } else if (cls.type === 'college') {
+        const inst = institutions.find((i) => i.id === cls.institutionId);
+        if (inst) targetName = inst.name;
+      }
+
+      markAttendance({
+        date: todayIso,
+        classId: cls.id,
+        type: cls.type,
+        studentId: cls.studentId,
+        institutionId: cls.institutionId,
+        targetName,
+        subject: cls.subject,
+        startTime: cls.startTime,
+        endTime: cls.endTime,
+        durationMinutes: cls.durationMinutes,
+        periodsCount: cls.type === 'college' ? 1 : undefined,
+        status: 'present',
+        notes: `Batch marked as present from dashboard`,
+      });
+    });
+
+    confetti({
+      particleCount: 50,
+      spread: 70,
+      origin: { y: 0.7 },
+    });
+
+    setBatchSuccessMsg(`All ${unmarkedTodayClasses.length} classes marked as Present!`);
+    setTimeout(() => setBatchSuccessMsg(null), 3000);
+  };
+
   const handleCopyReminder = (payment: (typeof overduePayments)[0]) => {
     const student = students.find((s) => s.id === payment.studentId);
     const parentName = student ? student.parentName : '';
@@ -112,6 +193,35 @@ export const Dashboard: React.FC = () => {
     navigator.clipboard.writeText(text);
     setCopiedPayId(payment.id);
     setTimeout(() => setCopiedPayId(null), 2500);
+  };
+
+  // WhatsApp link generator for payments
+  const getWhatsAppPaymentUrl = (payment: (typeof overduePayments)[0]) => {
+    const student = students.find((s) => s.id === payment.studentId);
+    const rawPhone = student?.parentPhone || student?.parentContact || student?.contactNumber || '';
+    const cleanPhone = rawPhone.replace(/[^0-9]/g, '');
+    const parentName = student ? student.parentName : '';
+    const text = generatePaymentReminderText(
+      payment.targetName,
+      parentName,
+      payment.remainingBalance,
+      payment.periodMonthYear,
+      payment.dueDate || 'due date',
+      settings.teacherName,
+      student?.paymentMethod || 'eSewa / Cash'
+    );
+    return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
+  };
+
+  // WhatsApp link for student absence notice
+  const getWhatsAppAbsenceUrl = (cls: (typeof todayClasses)[0]) => {
+    const student = students.find((s) => s.id === cls.studentId);
+    const rawPhone = student?.parentPhone || student?.parentContact || student?.contactNumber || '';
+    const cleanPhone = rawPhone.replace(/[^0-9]/g, '');
+    const studentName = student ? student.name : cls.title;
+    const parentName = student?.parentName ? `Dear ${student.parentName}, ` : '';
+    const text = `Namaste! ${parentName}This is a quick notice from ${settings.teacherName}. ${studentName} was marked absent for today's ${cls.subject || 'tuition'} session (${formatTime(cls.startTime, settings.timeFormat)}). Please let me know if a makeup class is needed.`;
+    return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
   };
 
   // Today Work vs Rest
@@ -380,13 +490,32 @@ export const Dashboard: React.FC = () => {
                 </p>
               </div>
 
-              <button
-                onClick={() => setActiveTab('routine')}
-                className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
-              >
-                Full Routine →
-              </button>
+              <div className="flex items-center gap-2">
+                {unmarkedTodayClasses.length > 0 && (
+                  <button
+                    onClick={handleMarkAllPresent}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs transition active:scale-95"
+                    title="Mark all remaining classes today as Present"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Mark All Present ({unmarkedTodayClasses.length})</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => setActiveTab('routine')}
+                  className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+                >
+                  Full Routine →
+                </button>
+              </div>
             </div>
+
+            {batchSuccessMsg && (
+              <div className="mt-3 p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-600" />
+                <span>{batchSuccessMsg}</span>
+              </div>
+            )}
 
             <div className="mt-4 space-y-3">
               {todayClasses.length === 0 ? (
@@ -410,6 +539,7 @@ export const Dashboard: React.FC = () => {
                   const att = getTodayAttendanceForClass(cls.id);
                   const isMarked = !!att;
                   const isCollege = cls.type === 'college';
+                  const liveStatus = getClassLiveStatus(cls.startTime, cls.endTime);
 
                   return (
                     <div
@@ -432,7 +562,7 @@ export const Dashboard: React.FC = () => {
                             style={{ backgroundColor: cls.color || '#3b82f6' }}
                           />
                           <div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center flex-wrap gap-2">
                               <span className="text-xs font-bold text-slate-900 dark:text-white">
                                 {formatTime(cls.startTime, settings.timeFormat)} -{' '}
                                 {formatTime(cls.endTime, settings.timeFormat)}
@@ -446,6 +576,11 @@ export const Dashboard: React.FC = () => {
                               >
                                 {isCollege ? 'College' : 'Home Tuition'}
                               </span>
+                              {liveStatus && (
+                                <span className={`px-2 py-0.5 text-[10px] rounded-md ${liveStatus.badgeClass}`}>
+                                  {liveStatus.label}
+                                </span>
+                              )}
                               {cls.dateSpecificSchedules?.some((s) => s.date === todayIso) && (
                                 <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
                                   ★ Date Override
@@ -462,44 +597,60 @@ export const Dashboard: React.FC = () => {
                         </div>
 
                         {/* Quick Attendance Action Buttons */}
-                        <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
-                          {isMarked ? (
-                            <div className="flex items-center gap-2">
-                              <span
-                                className={`px-2.5 py-1 text-xs font-bold rounded-lg ${
-                                  att.status === 'present'
-                                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
-                                    : att.status === 'absent'
-                                    ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300'
-                                    : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                                }`}
-                              >
-                                ✓ {att.status.toUpperCase()}
-                              </span>
-                              <button
-                                onClick={() => handleQuickMarkAttendance(cls, att.status === 'present' ? 'absent' : 'present')}
-                                title="Change status"
-                                className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
-                              >
-                                <RotateCcw className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => handleQuickMarkAttendance(cls, 'present')}
-                                className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition"
-                              >
-                                <CheckCircle2 className="w-3.5 h-3.5" />
-                                <span>Present</span>
-                              </button>
-                              <button
-                                onClick={() => handleQuickMarkAttendance(cls, 'absent')}
-                                className="px-2 py-1.5 text-xs font-medium rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-800/40 transition"
-                              >
-                                Absent
-                              </button>
-                            </div>
+                        <div className="flex flex-col sm:items-end gap-1.5 shrink-0 self-end sm:self-center">
+                          <div className="flex items-center gap-1.5">
+                            {isMarked ? (
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={`px-2.5 py-1 text-xs font-bold rounded-lg ${
+                                    att.status === 'present'
+                                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
+                                      : att.status === 'absent'
+                                      ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300'
+                                      : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                                  }`}
+                                >
+                                  ✓ {att.status.toUpperCase()}
+                                </span>
+                                <button
+                                  onClick={() => handleQuickMarkAttendance(cls, att.status === 'present' ? 'absent' : 'present')}
+                                  title="Change status"
+                                  className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                >
+                                  <RotateCcw className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => handleQuickMarkAttendance(cls, 'present')}
+                                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition active:scale-95"
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <span>Present</span>
+                                </button>
+                                <button
+                                  onClick={() => handleQuickMarkAttendance(cls, 'absent')}
+                                  className="px-2 py-1.5 text-xs font-medium rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-800/40 transition active:scale-95"
+                                >
+                                  Absent
+                                </button>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Instant WhatsApp Absence Alert */}
+                          {isMarked && att.status === 'absent' && cls.type === 'home_tuition' && (
+                            <a
+                              href={getWhatsAppAbsenceUrl(cls)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 hover:underline mt-0.5"
+                              title="Send WhatsApp absence notification to parent"
+                            >
+                              <Send className="w-3 h-3" />
+                              <span>Notify Parent on WhatsApp</span>
+                            </a>
                           )}
                         </div>
                       </div>
@@ -630,25 +781,39 @@ export const Dashboard: React.FC = () => {
                           </div>
                         </div>
 
-                        {/* Copy Reminder Message button */}
-                        <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-200/60 dark:border-slate-700/60 pt-2">
-                          <button
-                            id={`btn-copy-reminder-${payment.id}`}
-                            onClick={() => handleCopyReminder(payment)}
-                            className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 transition"
-                          >
-                            {isCopied ? (
-                              <>
-                                <Check className="w-3 h-3 text-emerald-600" />
-                                <span>Copied!</span>
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="w-3 h-3" />
-                                <span>Copy Reminder</span>
-                              </>
-                            )}
-                          </button>
+                        {/* Reminder Action Buttons */}
+                        <div className="mt-3 flex items-center justify-between gap-1.5 border-t border-slate-200/60 dark:border-slate-700/60 pt-2">
+                          <div className="flex items-center gap-1">
+                            <button
+                              id={`btn-copy-reminder-${payment.id}`}
+                              onClick={() => handleCopyReminder(payment)}
+                              className="flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 transition"
+                              title="Copy friendly SMS/WhatsApp reminder"
+                            >
+                              {isCopied ? (
+                                <>
+                                  <Check className="w-3 h-3 text-emerald-600" />
+                                  <span>Copied!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3 h-3" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
+
+                            <a
+                              href={getWhatsAppPaymentUrl(payment)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition"
+                              title="Open WhatsApp chat with reminder message"
+                            >
+                              <Send className="w-3 h-3" />
+                              <span>WhatsApp</span>
+                            </a>
+                          </div>
 
                           <button
                             onClick={() => openQuickAction('payment')}

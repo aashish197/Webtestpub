@@ -20,6 +20,7 @@ import {
   DollarSign,
   X,
   FileText,
+  Printer,
 } from 'lucide-react';
 import {
   formatCurrency,
@@ -166,6 +167,31 @@ export const PaymentsView: React.FC = () => {
     navigator.clipboard.writeText(msg);
     setCopiedId(rec.id);
     setTimeout(() => setCopiedId(null), 2500);
+  };
+
+  const getWhatsAppUrlForPayment = (rec: PaymentRecord) => {
+    const student = students.find((s) => s.id === rec.studentId);
+    const rawPhone = student?.parentPhone || student?.parentContact || student?.contactNumber || '';
+    const cleanPhone = rawPhone.replace(/[^0-9]/g, '');
+    const msg = generatePaymentReminderText(rec, student, settings);
+    return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
+  };
+
+  const getWhatsAppReceiptUrl = (rec: PaymentRecord) => {
+    const student = students.find((s) => s.id === rec.studentId);
+    const rawPhone = student?.parentPhone || student?.parentContact || student?.contactNumber || '';
+    const cleanPhone = rawPhone.replace(/[^0-9]/g, '');
+    const text = `*OFFICIAL TUITION PAYMENT RECEIPT*
+Receipt No: ${rec.receiptNumber || 'N/A'}
+Educator: ${settings.teacherName}
+Student: ${rec.targetName}
+Period / Month: ${rec.periodMonthYear}
+Amount Paid: ${formatCurrency(rec.amountPaid, settings.currency)}
+Payment Date: ${formatDisplayDate(rec.paymentDate, settings.dateSystem, 'medium')}
+Mode: ${rec.paymentMethod}
+${rec.remainingBalance > 0 ? `Remaining Due: ${formatCurrency(rec.remainingBalance, settings.currency)}\n` : 'Status: Fully Cleared (PAID)\n'}
+Thank you for your payment!`;
+    return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
   };
 
   const handleExportCsv = () => {
@@ -396,23 +422,36 @@ export const PaymentsView: React.FC = () => {
                       <td className="px-4 py-3 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1">
                           {isTuition && (p.status === 'pending' || p.status === 'overdue' || p.status === 'partial') && (
-                            <button
-                              onClick={() => handleCopyReminder(p)}
-                              className="px-2 py-1 text-[11px] font-semibold rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300 flex items-center gap-1"
-                              title="Copy friendly SMS/WhatsApp reminder"
-                            >
-                              {copiedId === p.id ? (
-                                <>
-                                  <Check className="w-3 h-3 text-emerald-600" />
-                                  <span>Copied!</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Send className="w-3 h-3" />
-                                  <span>Reminder</span>
-                                </>
-                              )}
-                            </button>
+                            <>
+                              <button
+                                onClick={() => handleCopyReminder(p)}
+                                className="px-2 py-1 text-[11px] font-semibold rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300 flex items-center gap-1"
+                                title="Copy friendly SMS/WhatsApp reminder"
+                              >
+                                {copiedId === p.id ? (
+                                  <>
+                                    <Check className="w-3 h-3 text-emerald-600" />
+                                    <span>Copied!</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="w-3 h-3" />
+                                    <span>Copy</span>
+                                  </>
+                                )}
+                              </button>
+
+                              <a
+                                href={getWhatsAppUrlForPayment(p)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-2 py-1 text-[11px] font-semibold rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 flex items-center gap-1"
+                                title="Send reminder directly via WhatsApp"
+                              >
+                                <Send className="w-3 h-3" />
+                                <span>WhatsApp</span>
+                              </a>
+                            </>
                           )}
 
                           <button
@@ -738,83 +777,155 @@ export const PaymentsView: React.FC = () => {
 
       {/* Printable Receipt Modal */}
       {receiptRecord && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full p-6 shadow-xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 max-w-lg w-full p-6 sm:p-7 shadow-2xl space-y-5 print:p-0 print:border-none print:shadow-none">
+            {/* Modal Top Controls (hidden on print) */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 print:hidden">
               <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-indigo-600" />
-                <h3 className="font-bold text-slate-900 dark:text-white">Payment Receipt</h3>
+                <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <h3 className="font-bold text-slate-900 dark:text-white text-base">Payment Receipt Voucher</h3>
               </div>
               <button
                 onClick={() => setReceiptRecord(null)}
-                className="p-1 rounded text-slate-400 hover:text-slate-600"
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs space-y-2.5">
-              <div className="text-center pb-2 border-b border-slate-200 dark:border-slate-700">
-                <h4 className="font-bold text-slate-900 dark:text-white text-sm">
+            {/* Receipt Certificate Content */}
+            <div className="p-6 rounded-2xl bg-slate-50/80 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs space-y-4 print:bg-white print:border-slate-300">
+              {/* Institution / Teacher Header */}
+              <div className="text-center pb-3 border-b border-dashed border-slate-200 dark:border-slate-700">
+                <span className="text-[10px] uppercase font-bold tracking-widest text-indigo-600 dark:text-indigo-400 block mb-1">
+                  OFFICIAL TUITION PAYMENT RECEIPT
+                </span>
+                <h4 className="font-extrabold text-slate-900 dark:text-white text-lg tracking-tight">
                   {settings.teacherName}
                 </h4>
-                <p className="text-[11px] text-slate-500">
-                  {settings.phone} • {settings.email}
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  Academic Tutoring & Private Coaching Services
                 </p>
-                <p className="text-[10px] text-slate-400 mt-1">
-                  Receipt No: {receiptRecord.receiptNumber || 'N/A'}
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  Contact: {settings.phone || 'N/A'} • Email: {settings.email || 'N/A'}
                 </p>
               </div>
 
-              <div className="flex justify-between">
-                <span className="text-slate-500">Received From:</span>
-                <span className="font-bold text-slate-900 dark:text-white">
-                  {receiptRecord.targetName}
-                </span>
-              </div>
-
-              <div className="flex justify-between">
-                <span className="text-slate-500">Period / Month:</span>
-                <span className="font-semibold text-slate-800 dark:text-slate-200">
-                  {receiptRecord.periodMonthYear}
-                </span>
-              </div>
-
-              <div className="flex justify-between">
-                <span className="text-slate-500">Date Paid:</span>
-                <span className="font-semibold text-slate-800 dark:text-slate-200">
-                  {formatDisplayDate(receiptRecord.paymentDate, settings.dateSystem, 'medium')}
-                </span>
-              </div>
-
-              <div className="flex justify-between">
-                <span className="text-slate-500">Payment Mode:</span>
-                <span className="font-semibold text-slate-800 dark:text-slate-200">
-                  {receiptRecord.paymentMethod}
-                </span>
-              </div>
-
-              <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center">
-                <span className="font-bold text-slate-800 dark:text-slate-200">Amount Paid:</span>
-                <span className="text-base font-bold text-emerald-600 dark:text-emerald-400">
-                  {formatCurrency(receiptRecord.amountPaid, settings.currency)}
-                </span>
-              </div>
-
-              {receiptRecord.remainingBalance > 0 && (
-                <div className="flex justify-between text-rose-500 font-semibold">
-                  <span>Balance Due:</span>
-                  <span>{formatCurrency(receiptRecord.remainingBalance, settings.currency)}</span>
+              {/* Receipt Metadata Pills */}
+              <div className="grid grid-cols-2 gap-2 text-[11px] bg-white dark:bg-slate-900/80 p-3 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+                <div>
+                  <span className="text-slate-400 block text-[10px] font-semibold uppercase">Receipt No.</span>
+                  <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                    {receiptRecord.receiptNumber || `RCP-${receiptRecord.id.slice(-6).toUpperCase()}`}
+                  </span>
                 </div>
-              )}
+                <div className="text-right">
+                  <span className="text-slate-400 block text-[10px] font-semibold uppercase">Payment Date</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                    {formatDisplayDate(receiptRecord.paymentDate, settings.dateSystem, 'medium')}
+                  </span>
+                </div>
+              </div>
+
+              {/* Itemized Particulars */}
+              <div className="space-y-2 pt-1">
+                <div className="flex justify-between py-1 border-b border-slate-200/50 dark:border-slate-700/50">
+                  <span className="text-slate-500">Student / Payee:</span>
+                  <span className="font-bold text-slate-900 dark:text-white">
+                    {receiptRecord.targetName}
+                  </span>
+                </div>
+
+                <div className="flex justify-between py-1 border-b border-slate-200/50 dark:border-slate-700/50">
+                  <span className="text-slate-500">Billing Period / Month:</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                    {receiptRecord.periodMonthYear}
+                  </span>
+                </div>
+
+                <div className="flex justify-between py-1 border-b border-slate-200/50 dark:border-slate-700/50">
+                  <span className="text-slate-500">Payment Mode:</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                    {receiptRecord.paymentMethod}
+                  </span>
+                </div>
+
+                {receiptRecord.referenceNote && (
+                  <div className="flex justify-between py-1 border-b border-slate-200/50 dark:border-slate-700/50">
+                    <span className="text-slate-500">Reference / Note:</span>
+                    <span className="text-slate-700 dark:text-slate-300 italic">
+                      {receiptRecord.referenceNote}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Totals & Clear Status Box */}
+              <div className="p-3.5 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/50 space-y-1.5">
+                <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                  <span>Total Amount Due:</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                    {formatCurrency(receiptRecord.amountDue, settings.currency)}
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-center pt-1 border-t border-indigo-200/60 dark:border-indigo-800/60">
+                  <span className="font-bold text-slate-900 dark:text-white text-sm">
+                    Amount Received:
+                  </span>
+                  <span className="text-base font-extrabold text-emerald-600 dark:text-emerald-400">
+                    {formatCurrency(receiptRecord.amountPaid, settings.currency)}
+                  </span>
+                </div>
+
+                {receiptRecord.remainingBalance > 0 ? (
+                  <div className="flex justify-between text-rose-600 dark:text-rose-400 font-bold text-xs pt-1 border-t border-indigo-200/60 dark:border-indigo-800/60">
+                    <span>Outstanding Balance:</span>
+                    <span>{formatCurrency(receiptRecord.remainingBalance, settings.currency)}</span>
+                  </div>
+                ) : (
+                  <div className="pt-1 text-center">
+                    <span className="inline-block px-3 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200 font-extrabold text-[10px] tracking-wider uppercase border border-emerald-300 dark:border-emerald-700">
+                      ✓ Paid in Full & Cleared
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Signature Line */}
+              <div className="pt-6 flex justify-between items-end text-[11px] text-slate-500">
+                <div className="text-[10px]">
+                  Generated via Teacher Suite<br />
+                  System Timestamp: {new Date().toLocaleDateString()}
+                </div>
+                <div className="text-right">
+                  <div className="w-32 border-b border-slate-400 dark:border-slate-500 mb-1" />
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">
+                    Authorized Educator Signature
+                  </span>
+                </div>
+              </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2">
+            {/* Modal Bottom Actions (hidden on print) */}
+            <div className="flex flex-wrap items-center justify-end gap-2 pt-2 print:hidden">
+              <a
+                href={getWhatsAppReceiptUrl(receiptRecord)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2 text-xs font-semibold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 shadow-sm transition active:scale-95"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Send via WhatsApp</span>
+              </a>
+
               <button
                 onClick={() => window.print()}
-                className="px-4 py-2 text-xs font-semibold rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 flex items-center gap-1.5"
+                className="px-4 py-2 text-xs font-semibold rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 flex items-center gap-1.5 shadow-sm transition active:scale-95"
               >
-                <Download className="w-3.5 h-3.5" />
+                <Printer className="w-3.5 h-3.5" />
                 <span>Print / Save PDF</span>
               </button>
             </div>
