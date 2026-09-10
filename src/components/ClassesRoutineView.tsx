@@ -390,10 +390,10 @@ export const ClassesRoutineView: React.FC = () => {
             <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
               <CalendarDays className="w-5 h-5" />
             </div>
-            Routine & Timetable Management
+            Classes & Routine Management
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Weekly schedules, daily routine timeline, and monthly calendar for tuitions and college lectures.
+            Weekly schedules, daily timetable, and all active tuition & college classes.
           </p>
         </div>
 

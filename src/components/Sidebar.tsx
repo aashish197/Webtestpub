@@ -57,10 +57,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onCloseMobile })
       icon: Building2,
       badge: institutions.length > 0 ? `${institutions.length}` : undefined,
     },
-    { id: 'classes', label: 'Classes', icon: GraduationCap },
     {
       id: 'routine',
-      label: 'Routine & Timetable',
+      label: 'Classes & Routine',
       icon: CalendarDays,
       badge: classesScheduledTodayCount > 0 ? `${classesScheduledTodayCount} today` : undefined,
       badgeColor: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
@@ -187,7 +186,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onCloseMobile })
         <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = activeTab === item.id;
+            const isActive = activeTab === item.id || (item.id === 'routine' && activeTab === 'classes');
             return (
               <button
                 key={item.id}

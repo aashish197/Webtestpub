@@ -38,14 +38,14 @@ const TAB_CONFIG: Record<
     description: 'Colleges, campuses, contract rates & period timings',
   },
   classes: {
-    label: 'Classes & Batches',
-    icon: GraduationCap,
-    description: 'All active classes, subjects, timings & start dates',
+    label: 'Classes & Routine',
+    icon: CalendarDays,
+    description: 'Weekly schedule, timetable, and active tuition & college classes',
   },
   routine: {
-    label: 'Routine & Timetable',
+    label: 'Classes & Routine',
     icon: CalendarDays,
-    description: 'Weekly schedule & hourly teaching calendar',
+    description: 'Weekly schedule, timetable, and active tuition & college classes',
   },
   attendance: {
     label: 'Attendance',
@@ -134,7 +134,7 @@ export const ViewHeaderNav: React.FC = () => {
           {[
             { id: 'dashboard', label: 'Dashboard' },
             { id: 'students', label: 'Students' },
-            { id: 'routine', label: 'Routine' },
+            { id: 'routine', label: 'Classes & Routine' },
             { id: 'attendance', label: 'Attendance' },
             { id: 'payments', label: 'Payments' },
             { id: 'calculator', label: 'Calculator' },

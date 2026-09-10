@@ -124,8 +124,8 @@ export const GlobalSearchModal: React.FC = () => {
     const actions = [
       {
         id: 'nav-routine',
-        title: 'View Weekly Routine & Schedule',
-        subtitle: 'View today’s periods and class timetable',
+        title: 'View Classes & Routine',
+        subtitle: 'Weekly timetable, periods, and class schedules',
         icon: CalendarDays,
         tab: 'routine',
         category: 'navigation',
