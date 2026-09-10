@@ -384,6 +384,7 @@ export const QuickActionModal: React.FC = () => {
 
     let activeWorkingDays = institutionData.workingDays;
     let totalPeriods = Number(institutionData.numberOfPeriods) || 1;
+    let finalDayWisePeriods: Record<DayOfWeek, number>;
 
     if (institutionData.scheduleType === 'day_wise') {
       activeWorkingDays = DAYS_OF_WEEK.filter((d) => (institutionData.dayWisePeriods[d] || 0) > 0);
@@ -392,6 +393,18 @@ export const QuickActionModal: React.FC = () => {
       }
       const activeCounts = activeWorkingDays.map((d) => institutionData.dayWisePeriods[d] || 0);
       totalPeriods = Math.max(1, Math.round(activeCounts.reduce((a, b) => a + b, 0) / (activeWorkingDays.length || 1)));
+      finalDayWisePeriods = { ...institutionData.dayWisePeriods };
+    } else {
+      // Uniform: calculate synchronized dayWisePeriods so breakdown matches workingDays and numberOfPeriods
+      finalDayWisePeriods = {
+        Sunday: activeWorkingDays.includes('Sunday') ? totalPeriods : 0,
+        Monday: activeWorkingDays.includes('Monday') ? totalPeriods : 0,
+        Tuesday: activeWorkingDays.includes('Tuesday') ? totalPeriods : 0,
+        Wednesday: activeWorkingDays.includes('Wednesday') ? totalPeriods : 0,
+        Thursday: activeWorkingDays.includes('Thursday') ? totalPeriods : 0,
+        Friday: activeWorkingDays.includes('Friday') ? totalPeriods : 0,
+        Saturday: activeWorkingDays.includes('Saturday') ? totalPeriods : 0,
+      };
     }
 
     addInstitution({
@@ -411,7 +424,7 @@ export const QuickActionModal: React.FC = () => {
       notes: institutionData.notes,
       status: 'active',
       scheduleType: institutionData.scheduleType,
-      dayWisePeriods: institutionData.dayWisePeriods,
+      dayWisePeriods: finalDayWisePeriods,
     });
 
     showSuccessFeedback(`Institution "${institutionData.name}" added successfully!`);
@@ -1614,7 +1627,18 @@ export const QuickActionModal: React.FC = () => {
                     <div className="flex items-center gap-1 bg-white dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700 text-xs">
                       <button
                         type="button"
-                        onClick={() => setInstitutionData({ ...institutionData, scheduleType: 'uniform' })}
+                        onClick={() => {
+                          const synced: Record<DayOfWeek, number> = {
+                            Sunday: institutionData.workingDays.includes('Sunday') ? institutionData.numberOfPeriods : 0,
+                            Monday: institutionData.workingDays.includes('Monday') ? institutionData.numberOfPeriods : 0,
+                            Tuesday: institutionData.workingDays.includes('Tuesday') ? institutionData.numberOfPeriods : 0,
+                            Wednesday: institutionData.workingDays.includes('Wednesday') ? institutionData.numberOfPeriods : 0,
+                            Thursday: institutionData.workingDays.includes('Thursday') ? institutionData.numberOfPeriods : 0,
+                            Friday: institutionData.workingDays.includes('Friday') ? institutionData.numberOfPeriods : 0,
+                            Saturday: institutionData.workingDays.includes('Saturday') ? institutionData.numberOfPeriods : 0,
+                          };
+                          setInstitutionData({ ...institutionData, scheduleType: 'uniform', dayWisePeriods: synced });
+                        }}
                         className={`px-2.5 py-1 rounded-md font-semibold transition ${
                           institutionData.scheduleType === 'uniform'
                             ? 'bg-indigo-600 text-white shadow-xs'
@@ -1625,7 +1649,18 @@ export const QuickActionModal: React.FC = () => {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setInstitutionData({ ...institutionData, scheduleType: 'day_wise' })}
+                        onClick={() => {
+                          const synced: Record<DayOfWeek, number> = {
+                            Sunday: institutionData.workingDays.includes('Sunday') ? (institutionData.dayWisePeriods?.Sunday || institutionData.numberOfPeriods) : 0,
+                            Monday: institutionData.workingDays.includes('Monday') ? (institutionData.dayWisePeriods?.Monday || institutionData.numberOfPeriods) : 0,
+                            Tuesday: institutionData.workingDays.includes('Tuesday') ? (institutionData.dayWisePeriods?.Tuesday || institutionData.numberOfPeriods) : 0,
+                            Wednesday: institutionData.workingDays.includes('Wednesday') ? (institutionData.dayWisePeriods?.Wednesday || institutionData.numberOfPeriods) : 0,
+                            Thursday: institutionData.workingDays.includes('Thursday') ? (institutionData.dayWisePeriods?.Thursday || institutionData.numberOfPeriods) : 0,
+                            Friday: institutionData.workingDays.includes('Friday') ? (institutionData.dayWisePeriods?.Friday || institutionData.numberOfPeriods) : 0,
+                            Saturday: institutionData.workingDays.includes('Saturday') ? (institutionData.dayWisePeriods?.Saturday || institutionData.numberOfPeriods) : 0,
+                          };
+                          setInstitutionData({ ...institutionData, scheduleType: 'day_wise', dayWisePeriods: synced });
+                        }}
                         className={`px-2.5 py-1 rounded-md font-semibold transition ${
                           institutionData.scheduleType === 'day_wise'
                             ? 'bg-indigo-600 text-white shadow-xs'
@@ -1654,7 +1689,17 @@ export const QuickActionModal: React.FC = () => {
                                   const newDays = isSelected
                                     ? institutionData.workingDays.filter((d) => d !== day)
                                     : [...institutionData.workingDays, day];
-                                  setInstitutionData({ ...institutionData, workingDays: newDays });
+                                  const synced: Record<DayOfWeek, number> = {
+                                    ...institutionData.dayWisePeriods,
+                                  };
+                                  DAYS_OF_WEEK.forEach((d) => {
+                                    synced[d] = newDays.includes(d) ? institutionData.numberOfPeriods : 0;
+                                  });
+                                  setInstitutionData({
+                                    ...institutionData,
+                                    workingDays: newDays,
+                                    dayWisePeriods: synced,
+                                  });
                                 }}
                                 className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
                                   isSelected
@@ -1679,12 +1724,23 @@ export const QuickActionModal: React.FC = () => {
                             min="1"
                             max="10"
                             value={institutionData.numberOfPeriods}
-                            onChange={(e) =>
+                            onChange={(e) => {
+                              const val = Math.max(1, Number(e.target.value));
+                              const synced: Record<DayOfWeek, number> = {
+                                Sunday: institutionData.workingDays.includes('Sunday') ? val : 0,
+                                Monday: institutionData.workingDays.includes('Monday') ? val : 0,
+                                Tuesday: institutionData.workingDays.includes('Tuesday') ? val : 0,
+                                Wednesday: institutionData.workingDays.includes('Wednesday') ? val : 0,
+                                Thursday: institutionData.workingDays.includes('Thursday') ? val : 0,
+                                Friday: institutionData.workingDays.includes('Friday') ? val : 0,
+                                Saturday: institutionData.workingDays.includes('Saturday') ? val : 0,
+                              };
                               setInstitutionData({
                                 ...institutionData,
-                                numberOfPeriods: Number(e.target.value),
-                              })
-                            }
+                                numberOfPeriods: val,
+                                dayWisePeriods: synced,
+                              });
+                            }}
                             className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                           />
                         </div>

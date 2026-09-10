@@ -162,6 +162,43 @@ const STORAGE_KEYS = {
   DISMISSED_NOTIFICATIONS: 'tcm_dismissed_notifs_v1',
 };
 
+export const sanitizeInstitution = (inst: Institution): Institution => {
+  const isExplicitDayWise = inst.scheduleType === 'day_wise';
+  const hasMismatchWithDefault =
+    !isExplicitDayWise ||
+    (Array.isArray(inst.workingDays) &&
+      inst.workingDays.length > 0 &&
+      !inst.workingDays.includes('Sunday') &&
+      inst.dayWisePeriods?.['Sunday'] === 2 &&
+      inst.numberOfPeriods !== 2);
+
+  if (inst.scheduleType === 'uniform' || hasMismatchWithDefault) {
+    const workingDays =
+      Array.isArray(inst.workingDays) && inst.workingDays.length > 0
+        ? inst.workingDays
+        : (['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] as DayOfWeek[]);
+    const periods = inst.numberOfPeriods || 3;
+    const syncedDayWise: Partial<Record<DayOfWeek, number>> = {
+      Sunday: workingDays.includes('Sunday') ? periods : 0,
+      Monday: workingDays.includes('Monday') ? periods : 0,
+      Tuesday: workingDays.includes('Tuesday') ? periods : 0,
+      Wednesday: workingDays.includes('Wednesday') ? periods : 0,
+      Thursday: workingDays.includes('Thursday') ? periods : 0,
+      Friday: workingDays.includes('Friday') ? periods : 0,
+      Saturday: workingDays.includes('Saturday') ? periods : 0,
+    };
+    return {
+      ...inst,
+      workingDays,
+      numberOfPeriods: periods,
+      scheduleType: 'uniform',
+      dayWisePeriods: syncedDayWise,
+    };
+  }
+
+  return inst;
+};
+
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -239,7 +276,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [institutions, setInstitutions] = useState<Institution[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.INSTITUTIONS);
-      return saved ? JSON.parse(saved) : INITIAL_INSTITUTIONS;
+      const raw = saved ? JSON.parse(saved) : INITIAL_INSTITUTIONS;
+      return Array.isArray(raw) ? raw.map(sanitizeInstitution) : INITIAL_INSTITUTIONS;
     } catch {
       return INITIAL_INSTITUTIONS;
     }
@@ -363,7 +401,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             const data = docSnap.data();
             if (data.settings) setSettings(prev => ({ ...prev, ...data.settings }));
             if (Array.isArray(data.students)) setStudents(data.students);
-            if (Array.isArray(data.institutions)) setInstitutions(data.institutions);
+            if (Array.isArray(data.institutions)) setInstitutions(data.institutions.map(sanitizeInstitution));
             if (Array.isArray(data.classes)) setClasses(data.classes);
             if (Array.isArray(data.attendance)) setAttendance(data.attendance);
             if (Array.isArray(data.payments)) setPayments(data.payments);
@@ -594,17 +632,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Institution Actions
   const addInstitution = (instData: Omit<Institution, 'id' | 'createdAt'>): Institution => {
-    const newInst: Institution = {
+    const newInst: Institution = sanitizeInstitution({
       ...instData,
       id: `inst-${Date.now()}`,
       createdAt: new Date().toISOString(),
-    };
+    });
     setInstitutions(prev => [newInst, ...prev]);
     return newInst;
   };
 
   const updateInstitution = (id: string, data: Partial<Institution>) => {
-    setInstitutions(prev => prev.map(i => (i.id === id ? { ...i, ...data } : i)));
+    setInstitutions(prev => prev.map(i => (i.id === id ? sanitizeInstitution({ ...i, ...data }) : i)));
   };
 
   const deleteInstitution = (id: string) => {

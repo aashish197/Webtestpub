@@ -144,8 +144,8 @@ export function resolveInstitutionSchedule(
   }
 
   // 2. Check for day-wise schedule
-  if (inst.scheduleType === 'day_wise' || inst.dayWisePeriods) {
-    const periods = inst.dayWisePeriods?.[day] ?? (inst.workingDays.includes(day) ? inst.numberOfPeriods : 0);
+  if (inst.scheduleType === 'day_wise' || (!inst.scheduleType && inst.dayWisePeriods && !inst.workingDays?.length)) {
+    const periods = inst.dayWisePeriods?.[day] ?? (inst.workingDays?.includes(day) ? inst.numberOfPeriods : 0);
     const daySchedule = inst.dayWiseSchedule?.find((s) => s.day === day);
     return {
       periods,
@@ -158,7 +158,7 @@ export function resolveInstitutionSchedule(
   }
 
   // 3. Uniform schedule
-  const isWorking = inst.workingDays.includes(day);
+  const isWorking = (inst.workingDays || []).includes(day);
   return {
     periods: isWorking ? inst.numberOfPeriods : 0,
     startTime: inst.startTime,

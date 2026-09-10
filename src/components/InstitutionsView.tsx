@@ -71,7 +71,7 @@ export const InstitutionsView: React.FC = () => {
     facultyOrGrade: '+2 Science (Grade 12)',
     subjects: ['Physics'],
     section: 'Section A',
-    numberOfPeriods: 2,
+    numberOfPeriods: 3,
     periodDurationMinutes: 45,
     workingDays: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
     paymentStructure: 'monthly',
@@ -83,7 +83,15 @@ export const InstitutionsView: React.FC = () => {
     notes: '',
     status: 'active',
     scheduleType: 'uniform',
-    dayWisePeriods: { ...DEFAULT_DAY_WISE_PERIODS },
+    dayWisePeriods: {
+      Sunday: 3,
+      Monday: 3,
+      Tuesday: 3,
+      Wednesday: 3,
+      Thursday: 3,
+      Friday: 3,
+      Saturday: 0,
+    },
     dayWiseSchedule: [],
   };
 
@@ -114,6 +122,8 @@ export const InstitutionsView: React.FC = () => {
   const handleOpenEdit = (inst: Institution) => {
     setEditingInst(inst);
 
+    const isDayWise = inst.scheduleType === 'day_wise';
+
     // Reconstruct or fallback dayWisePeriods
     const dayWise: Record<DayOfWeek, number> = {
       Sunday: 0,
@@ -123,13 +133,16 @@ export const InstitutionsView: React.FC = () => {
       Thursday: 0,
       Friday: 0,
       Saturday: 0,
-      ...(inst.dayWisePeriods || {}),
     };
 
-    // If inst didn't have dayWisePeriods previously, populate from its workingDays
-    if (!inst.dayWisePeriods) {
+    if (isDayWise && inst.dayWisePeriods) {
       DAYS_OF_WEEK.forEach((d) => {
-        dayWise[d] = inst.workingDays.includes(d) ? inst.numberOfPeriods : 0;
+        dayWise[d] = inst.dayWisePeriods?.[d] ?? 0;
+      });
+    } else {
+      // Uniform: synchronize strictly from workingDays and numberOfPeriods
+      DAYS_OF_WEEK.forEach((d) => {
+        dayWise[d] = (inst.workingDays || []).includes(d) ? inst.numberOfPeriods : 0;
       });
     }
 
@@ -140,7 +153,7 @@ export const InstitutionsView: React.FC = () => {
       section: inst.section || '',
       numberOfPeriods: inst.numberOfPeriods,
       periodDurationMinutes: inst.periodDurationMinutes,
-      workingDays: [...inst.workingDays],
+      workingDays: [...(inst.workingDays || [])],
       paymentStructure: inst.paymentStructure,
       rateAmount: inst.rateAmount,
       extraClassRate: inst.extraClassRate || 0,
@@ -150,7 +163,7 @@ export const InstitutionsView: React.FC = () => {
       contactNumber: inst.contactNumber || '',
       notes: inst.notes || '',
       status: inst.status,
-      scheduleType: inst.scheduleType || (inst.dayWisePeriods ? 'day_wise' : 'uniform'),
+      scheduleType: isDayWise ? 'day_wise' : 'uniform',
       dayWisePeriods: dayWise,
       dayWiseSchedule: inst.dayWiseSchedule ? [...inst.dayWiseSchedule] : [],
     });
@@ -164,17 +177,40 @@ export const InstitutionsView: React.FC = () => {
 
     let finalWorkingDays = [...formData.workingDays];
     let finalNumberOfPeriods = formData.numberOfPeriods;
+    let finalDayWisePeriods: Record<DayOfWeek, number>;
 
     if (formData.scheduleType === 'day_wise' && formData.dayWisePeriods) {
       finalWorkingDays = DAYS_OF_WEEK.filter((d) => (formData.dayWisePeriods?.[d] ?? 0) > 0);
       const totalWeekly = DAYS_OF_WEEK.reduce((sum, d) => sum + (formData.dayWisePeriods?.[d] ?? 0), 0);
       finalNumberOfPeriods = finalWorkingDays.length > 0 ? Math.round(totalWeekly / finalWorkingDays.length) || 1 : 1;
+      finalDayWisePeriods = {
+        Sunday: formData.dayWisePeriods.Sunday ?? 0,
+        Monday: formData.dayWisePeriods.Monday ?? 0,
+        Tuesday: formData.dayWisePeriods.Tuesday ?? 0,
+        Wednesday: formData.dayWisePeriods.Wednesday ?? 0,
+        Thursday: formData.dayWisePeriods.Thursday ?? 0,
+        Friday: formData.dayWisePeriods.Friday ?? 0,
+        Saturday: formData.dayWisePeriods.Saturday ?? 0,
+      };
+    } else {
+      // Uniform: calculate synchronized dayWisePeriods so breakdown matches workingDays and numberOfPeriods
+      finalDayWisePeriods = {
+        Sunday: finalWorkingDays.includes('Sunday') ? finalNumberOfPeriods : 0,
+        Monday: finalWorkingDays.includes('Monday') ? finalNumberOfPeriods : 0,
+        Tuesday: finalWorkingDays.includes('Tuesday') ? finalNumberOfPeriods : 0,
+        Wednesday: finalWorkingDays.includes('Wednesday') ? finalNumberOfPeriods : 0,
+        Thursday: finalWorkingDays.includes('Thursday') ? finalNumberOfPeriods : 0,
+        Friday: finalWorkingDays.includes('Friday') ? finalNumberOfPeriods : 0,
+        Saturday: finalWorkingDays.includes('Saturday') ? finalNumberOfPeriods : 0,
+      };
     }
 
     const payload = {
       ...formData,
+      scheduleType: formData.scheduleType,
       workingDays: finalWorkingDays,
       numberOfPeriods: finalNumberOfPeriods,
+      dayWisePeriods: finalDayWisePeriods,
     };
 
     if (editingInst) {
@@ -186,17 +222,23 @@ export const InstitutionsView: React.FC = () => {
   };
 
   const handleToggleDay = (day: DayOfWeek) => {
-    if (formData.workingDays.includes(day)) {
-      setFormData({
-        ...formData,
-        workingDays: formData.workingDays.filter((d) => d !== day),
-      });
-    } else {
-      setFormData({
-        ...formData,
-        workingDays: [...formData.workingDays, day],
-      });
-    }
+    const updatedDays = formData.workingDays.includes(day)
+      ? formData.workingDays.filter((d) => d !== day)
+      : [...formData.workingDays, day];
+
+    // Keep dayWisePeriods in sync for uniform mode
+    const updatedDayWise: Record<DayOfWeek, number> = {
+      ...(formData.dayWisePeriods || DEFAULT_DAY_WISE_PERIODS),
+    };
+    DAYS_OF_WEEK.forEach((d) => {
+      updatedDayWise[d] = updatedDays.includes(d) ? formData.numberOfPeriods : 0;
+    });
+
+    setFormData({
+      ...formData,
+      workingDays: updatedDays,
+      dayWisePeriods: updatedDayWise,
+    });
   };
 
   const handleUpdateDayPeriods = (day: DayOfWeek, periods: number) => {
@@ -461,59 +503,53 @@ export const InstitutionsView: React.FC = () => {
                     <div className="flex items-center justify-between">
                       <span className="text-slate-500">Routine Type:</span>
                       <span className="font-semibold text-slate-800 dark:text-slate-200">
-                        {inst.scheduleType === 'day_wise' || inst.dayWisePeriods
+                        {inst.scheduleType === 'day_wise'
                           ? 'Variable Day-Wise Schedule'
                           : 'Same Periods Daily'}
                       </span>
                     </div>
 
-                    {/* Day-Wise Variable Schedule Pills if configured */}
-                    {inst.scheduleType === 'day_wise' || inst.dayWisePeriods ? (
-                      <div className="pt-1.5 pb-1 border-t border-slate-200/60 dark:border-slate-700/60">
-                        <div className="flex items-center justify-between text-[11px] mb-1.5">
-                          <span className="font-semibold text-purple-700 dark:text-purple-300 flex items-center gap-1">
-                            <CalendarDays className="w-3.5 h-3.5" />
-                            Weekly Periods Breakdown:
-                          </span>
-                          <span className="font-bold text-slate-700 dark:text-slate-300">
-                            {DAYS_OF_WEEK.reduce((sum, d) => sum + (inst.dayWisePeriods?.[d] ?? 0), 0)} periods / wk
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-7 gap-1 text-center">
-                          {DAYS_OF_WEEK.map((d) => {
-                            const count =
-                              inst.dayWisePeriods?.[d] ??
-                              (inst.workingDays.includes(d) ? inst.numberOfPeriods : 0);
-                            const isActive = count > 0;
-                            return (
-                              <div
-                                key={d}
-                                className={`py-1 px-0.5 rounded-lg text-[10px] ${
-                                  isActive
-                                    ? 'bg-purple-100 dark:bg-purple-900/60 text-purple-800 dark:text-purple-200 font-bold'
-                                    : 'bg-slate-200/50 dark:bg-slate-800/40 text-slate-400 font-normal'
-                                }`}
-                                title={`${d}: ${count > 0 ? `${count} period(s)` : 'No Class'}`}
-                              >
-                                <div className="text-[9px] uppercase tracking-tighter text-slate-500 dark:text-slate-400">
-                                  {d.slice(0, 3)}
-                                </div>
-                                <div className="mt-0.5">{count > 0 ? `${count}p` : '—'}</div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-500">Working Days:</span>
-                        <span className="font-semibold text-slate-800 dark:text-slate-200">
-                          {(inst.workingDays || []).length === 7
-                            ? 'Daily'
-                            : (inst.workingDays || []).map((d) => d.slice(0, 3)).join(', ') || 'None'}
+                    {/* Weekly Periods Breakdown Pills */}
+                    <div className="pt-1.5 pb-1 border-t border-slate-200/60 dark:border-slate-700/60">
+                      <div className="flex items-center justify-between text-[11px] mb-1.5">
+                        <span className="font-semibold text-purple-700 dark:text-purple-300 flex items-center gap-1">
+                          <CalendarDays className="w-3.5 h-3.5" />
+                          Weekly Periods Breakdown:
+                        </span>
+                        <span className="font-bold text-slate-700 dark:text-slate-300">
+                          {inst.scheduleType === 'day_wise' && inst.dayWisePeriods
+                            ? `${DAYS_OF_WEEK.reduce((sum, d) => sum + (inst.dayWisePeriods?.[d] ?? 0), 0)} periods / wk`
+                            : `${(inst.workingDays || []).length * inst.numberOfPeriods} periods / wk (${(inst.workingDays || []).length} days × ${inst.numberOfPeriods}p)`}
                         </span>
                       </div>
-                    )}
+                      <div className="grid grid-cols-7 gap-1 text-center">
+                        {DAYS_OF_WEEK.map((d) => {
+                          const count =
+                            inst.scheduleType === 'day_wise' && inst.dayWisePeriods
+                              ? inst.dayWisePeriods?.[d] ?? 0
+                              : (inst.workingDays || []).includes(d)
+                              ? inst.numberOfPeriods
+                              : 0;
+                          const isActive = count > 0;
+                          return (
+                            <div
+                              key={d}
+                              className={`py-1 px-0.5 rounded-lg text-[10px] ${
+                                isActive
+                                  ? 'bg-purple-100 dark:bg-purple-900/60 text-purple-800 dark:text-purple-200 font-bold'
+                                  : 'bg-slate-200/50 dark:bg-slate-800/40 text-slate-400 font-normal'
+                              }`}
+                              title={`${d}: ${count > 0 ? `${count} period(s)` : 'No Class'}`}
+                            >
+                              <div className="text-[9px] uppercase tracking-tighter text-slate-500 dark:text-slate-400">
+                                {d.slice(0, 3)}
+                              </div>
+                              <div className="mt-0.5">{count > 0 ? `${count}p` : '—'}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
 
                     <div className="flex items-center justify-between">
                       <span className="text-slate-500">Period Duration:</span>
@@ -738,7 +774,18 @@ export const InstitutionsView: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <button
                     type="button"
-                    onClick={() => setFormData({ ...formData, scheduleType: 'uniform' })}
+                    onClick={() => {
+                      const synced: Record<DayOfWeek, number> = {
+                        Sunday: formData.workingDays.includes('Sunday') ? formData.numberOfPeriods : 0,
+                        Monday: formData.workingDays.includes('Monday') ? formData.numberOfPeriods : 0,
+                        Tuesday: formData.workingDays.includes('Tuesday') ? formData.numberOfPeriods : 0,
+                        Wednesday: formData.workingDays.includes('Wednesday') ? formData.numberOfPeriods : 0,
+                        Thursday: formData.workingDays.includes('Thursday') ? formData.numberOfPeriods : 0,
+                        Friday: formData.workingDays.includes('Friday') ? formData.numberOfPeriods : 0,
+                        Saturday: formData.workingDays.includes('Saturday') ? formData.numberOfPeriods : 0,
+                      };
+                      setFormData({ ...formData, scheduleType: 'uniform', dayWisePeriods: synced });
+                    }}
                     className={`p-3 rounded-xl border text-left transition flex items-start gap-2.5 ${
                       formData.scheduleType === 'uniform'
                         ? 'border-purple-500 bg-purple-50/70 dark:bg-purple-950/30 ring-2 ring-purple-500/20'
@@ -759,14 +806,25 @@ export const InstitutionsView: React.FC = () => {
                         Same Periods Daily
                       </div>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                        Fixed period count on all working days (e.g. 2 periods every day)
+                        Fixed period count on all working days (e.g. 3 periods every day)
                       </p>
                     </div>
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => setFormData({ ...formData, scheduleType: 'day_wise' })}
+                    onClick={() => {
+                      const synced: Record<DayOfWeek, number> = {
+                        Sunday: formData.workingDays.includes('Sunday') ? (formData.dayWisePeriods?.Sunday || formData.numberOfPeriods) : 0,
+                        Monday: formData.workingDays.includes('Monday') ? (formData.dayWisePeriods?.Monday || formData.numberOfPeriods) : 0,
+                        Tuesday: formData.workingDays.includes('Tuesday') ? (formData.dayWisePeriods?.Tuesday || formData.numberOfPeriods) : 0,
+                        Wednesday: formData.workingDays.includes('Wednesday') ? (formData.dayWisePeriods?.Wednesday || formData.numberOfPeriods) : 0,
+                        Thursday: formData.workingDays.includes('Thursday') ? (formData.dayWisePeriods?.Thursday || formData.numberOfPeriods) : 0,
+                        Friday: formData.workingDays.includes('Friday') ? (formData.dayWisePeriods?.Friday || formData.numberOfPeriods) : 0,
+                        Saturday: formData.workingDays.includes('Saturday') ? (formData.dayWisePeriods?.Saturday || formData.numberOfPeriods) : 0,
+                      };
+                      setFormData({ ...formData, scheduleType: 'day_wise', dayWisePeriods: synced });
+                    }}
                     className={`p-3 rounded-xl border text-left transition flex items-start gap-2.5 ${
                       formData.scheduleType === 'day_wise'
                         ? 'border-purple-500 bg-purple-50/70 dark:bg-purple-950/30 ring-2 ring-purple-500/20'
@@ -1001,12 +1059,23 @@ export const InstitutionsView: React.FC = () => {
                         min={1}
                         max={10}
                         value={formData.numberOfPeriods}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const val = Math.max(1, Number(e.target.value));
+                          const synced: Record<DayOfWeek, number> = {
+                            Sunday: formData.workingDays.includes('Sunday') ? val : 0,
+                            Monday: formData.workingDays.includes('Monday') ? val : 0,
+                            Tuesday: formData.workingDays.includes('Tuesday') ? val : 0,
+                            Wednesday: formData.workingDays.includes('Wednesday') ? val : 0,
+                            Thursday: formData.workingDays.includes('Thursday') ? val : 0,
+                            Friday: formData.workingDays.includes('Friday') ? val : 0,
+                            Saturday: formData.workingDays.includes('Saturday') ? val : 0,
+                          };
                           setFormData({
                             ...formData,
-                            numberOfPeriods: Number(e.target.value),
-                          })
-                        }
+                            numberOfPeriods: val,
+                            dayWisePeriods: synced,
+                          });
+                        }}
                         className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                       />
                     )}
