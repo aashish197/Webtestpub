@@ -254,7 +254,7 @@ export const Dashboard: React.FC = () => {
               {settings.dateSystem === 'BS' ? 'Bikram Sambat' : 'AD Calendar'}
             </span>
             <span className="text-xs text-slate-300">
-              {todayDayName}, {formatDisplayDate(todayIso, settings.dateSystem, 'long')}
+              {formatDisplayDate(todayIso, settings.dateSystem, 'long')}
             </span>
           </div>
           <h1 className="text-xl sm:text-2xl font-bold mt-1.5 tracking-tight">

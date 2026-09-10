@@ -208,7 +208,7 @@ export function formatDisplayDate(
   }
   
   const options: Intl.DateTimeFormatOptions = style === 'long'
-    ? { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }
+    ? { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' }
     : { year: 'numeric', month: 'short', day: 'numeric' };
 
   return adDate.toLocaleDateString('en-US', options);

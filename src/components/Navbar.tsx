@@ -1,8 +1,6 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
-import { formatDisplayDate, getTodayIso } from '../utils/nepaliCalendar';
 import {
-  Calendar,
   Bell,
   Plus,
   Search,
@@ -53,9 +51,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu }) => {
   };
 
   const unreadCount = notifications.length;
-  const todayIso = getTodayIso();
-  const displayDateStr = formatDisplayDate(todayIso, settings.dateSystem, 'long');
-  const otherDateStr = formatDisplayDate(todayIso, settings.dateSystem === 'AD' ? 'BS' : 'AD', 'medium');
 
   return (
     <header className="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-b border-slate-200 dark:border-slate-800 transition-colors">
@@ -123,39 +118,32 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu }) => {
           >
             <Search className="w-5 h-5 text-slate-700 dark:text-slate-300" />
           </button>
-          {/* AD / BS Dual Date Pill Toggle */}
-          <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+          {/* Calendar System Switcher (BS / AD) */}
+          <div
+            id="navbar-date-system-switch"
+            className="flex items-center p-0.5 sm:p-1 rounded-xl bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 shadow-2xs"
+            title="Switch calendar format: Bikram Sambat (BS) or Anno Domini (AD)"
+          >
             <button
-              id="btn-date-system-toggle"
-              onClick={toggleDateSystem}
-              title={`Switch calendar format between AD and BS (Currently: ${settings.dateSystem})`}
-              className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 shadow-xs transition"
-            >
-              <Calendar className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-              <span className="font-semibold text-indigo-700 dark:text-indigo-300">
-                {settings.dateSystem}
-              </span>
-              <span className="hidden xl:inline text-slate-600 dark:text-slate-300 font-normal">
-                ({displayDateStr})
-              </span>
-            </button>
-
-            <button
-              onClick={toggleDateSystem}
-              className={`px-2 py-0.5 text-[11px] font-bold rounded-md transition ${
+              id="btn-switch-bs"
+              type="button"
+              onClick={() => settings.dateSystem !== 'BS' && toggleDateSystem()}
+              className={`px-2.5 sm:px-3 py-1 text-xs font-bold rounded-lg transition-all active:scale-95 ${
                 settings.dateSystem === 'BS'
                   ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               BS
             </button>
             <button
-              onClick={toggleDateSystem}
-              className={`px-2 py-0.5 text-[11px] font-bold rounded-md transition ${
+              id="btn-switch-ad"
+              type="button"
+              onClick={() => settings.dateSystem !== 'AD' && toggleDateSystem()}
+              className={`px-2.5 sm:px-3 py-1 text-xs font-bold rounded-lg transition-all active:scale-95 ${
                 settings.dateSystem === 'AD'
                   ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               AD
