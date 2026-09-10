@@ -91,7 +91,9 @@ export const AuthModal: React.FC = () => {
       case 'auth/popup-closed-by-user':
         return 'Sign-in cancelled. Please try again.';
       case 'auth/unauthorized-domain':
-        return 'Unauthorized Domain: Your Netlify domain must be added to the Authorized Domains in Firebase Console. (You can also use Email & Password sign-in directly).';
+        return 'Unauthorized Domain: Your Netlify domain must be added to the Authorized Domains in Firebase Console.';
+      case 'auth/operation-not-allowed':
+        return 'Email/Password sign-in is currently disabled in your Firebase project. Please enable "Email/Password" in Firebase Console (Authentication > Sign-in method).';
       default:
         return err?.message || 'Authentication failed. Please try again.';
     }

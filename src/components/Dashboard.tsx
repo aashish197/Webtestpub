@@ -49,6 +49,7 @@ export const Dashboard: React.FC = () => {
     openQuickAction,
     students,
     institutions,
+    currentUser,
   } = useApp();
 
   const [copiedPayId, setCopiedPayId] = useState<string | null>(null);
@@ -257,7 +258,7 @@ export const Dashboard: React.FC = () => {
             </span>
           </div>
           <h1 className="text-xl sm:text-2xl font-bold mt-1.5 tracking-tight">
-            Welcome back, {settings.teacherName.split(' ')[0] || 'Teacher'} 👋
+            Welcome back, {((currentUser?.displayName || settings.teacherName).split(' ')[0]) || 'Teacher'} 👋
           </h1>
           <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-xl">
             You have <strong className="text-white">{todayClasses.length} classes</strong> scheduled
