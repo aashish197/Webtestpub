@@ -262,3 +262,139 @@ export function getDayOfWeek(dateStrOrObj: string | Date): DayOfWeek {
   return days[dayIdx];
 }
 
+/**
+ * Safely parse date from ISO string YYYY-MM-DD or Date object without timezone drift
+ */
+export function parseDateSafe(dateInput: string | Date | null | undefined): Date | null {
+  if (!dateInput) return null;
+  if (dateInput instanceof Date) return isNaN(dateInput.getTime()) ? null : dateInput;
+  if (typeof dateInput === 'string') {
+    const trimmed = dateInput.trim();
+    if (!trimmed) return null;
+    const parts = trimmed.split('T')[0].split('-');
+    if (parts.length === 3) {
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const d = parseInt(parts[2], 10);
+      if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+        return new Date(y, m, d, 12, 0, 0);
+      }
+    }
+    const dt = new Date(trimmed);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+  return null;
+}
+
+/**
+ * Formats date showing BOTH Gregorian (AD) and Bikram Sambat (BS) simultaneously
+ * e.g. "Sep 10, 2026 AD (25 Bhadra 2083 BS)" or "2026-09-10 AD (2083-05-25 BS)"
+ */
+export function formatDualDate(
+  dateInput: string | Date | null | undefined,
+  style: 'standard' | 'short' | 'compact' = 'standard'
+): string {
+  if (!dateInput) return '-';
+  const adDate = parseDateSafe(dateInput);
+  if (!adDate) return String(dateInput);
+
+  const bs = adToBs(adDate);
+  const bsMonthName = NEPALI_MONTHS_EN[bs.month - 1] || `Month ${bs.month}`;
+  const bsMonthStr = String(bs.month).padStart(2, '0');
+  const bsDayStr = String(bs.day).padStart(2, '0');
+
+  if (style === 'compact' || style === 'short') {
+    const y = adDate.getFullYear();
+    const m = String(adDate.getMonth() + 1).padStart(2, '0');
+    const d = String(adDate.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d} AD (${bs.year}-${bsMonthStr}-${bsDayStr} BS)`;
+  }
+
+  const adFormatted = adDate.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  return `${adFormatted} AD (${bs.day} ${bsMonthName} ${bs.year} BS)`;
+}
+
+export interface CalculatedPaymentSchedule {
+  receivingDateIso: string;
+  dueDateIso: string;
+  receivingDateDual: string;
+  dueDateDual: string;
+  daysUntilDue: number;
+  isOverdue: boolean;
+  isDueToday: boolean;
+  isDueSoon: boolean;
+  cycleMonthLabel: string;
+}
+
+/**
+ * Calculate payment receiving date and due date from receiving day and due days (grace period)
+ * @param receivingDay 1 to 31 for AD, 1 to 32 for BS
+ * @param dueDays Days allowed after receiving day until payment is due
+ * @param calendarSystem 'AD' or 'BS'
+ * @param referenceDate Optional reference date (defaults to today)
+ */
+export function calculatePaymentSchedule(
+  receivingDay: number = 1,
+  dueDays: number = 0,
+  calendarSystem: 'AD' | 'BS' = 'BS',
+  referenceDate?: string | Date
+): CalculatedPaymentSchedule {
+  const refDate = parseDateSafe(referenceDate) || new Date();
+  let receivingDate: Date;
+  let cycleMonthLabel = '';
+
+  const safeDueDays = Math.max(0, Number(dueDays) || 0);
+
+  if (calendarSystem === 'BS') {
+    const currentBs = adToBs(refDate);
+    const year = currentBs.year;
+    const month = currentBs.month;
+    const monthDaysList = BS_MONTH_DAYS[year] || [31, 31, 31, 31, 31, 31, 30, 30, 30, 30, 30, 30];
+    const maxDays = monthDaysList[month - 1] || 32;
+    const clampedDay = Math.max(1, Math.min(receivingDay || 1, maxDays));
+
+    receivingDate = bsToAd({ year, month, day: clampedDay });
+    cycleMonthLabel = `${NEPALI_MONTHS_EN[month - 1]} ${year} BS`;
+  } else {
+    // AD
+    const year = refDate.getFullYear();
+    const month = refDate.getMonth();
+    const maxDays = new Date(year, month + 1, 0).getDate();
+    const clampedDay = Math.max(1, Math.min(receivingDay || 1, maxDays));
+
+    receivingDate = new Date(year, month, clampedDay, 12, 0, 0);
+    cycleMonthLabel = receivingDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  }
+
+  const dueDate = new Date(receivingDate);
+  dueDate.setDate(dueDate.getDate() + safeDueDays);
+
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const receivingDateIso = `${receivingDate.getFullYear()}-${pad(receivingDate.getMonth() + 1)}-${pad(receivingDate.getDate())}`;
+  const dueDateIso = `${dueDate.getFullYear()}-${pad(dueDate.getMonth() + 1)}-${pad(dueDate.getDate())}`;
+
+  // Difference in whole calendar days from today
+  const today = new Date();
+  const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12, 0, 0);
+  const dueMid = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate(), 12, 0, 0);
+  const diffTime = dueMid.getTime() - todayMid.getTime();
+  const daysUntilDue = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+  return {
+    receivingDateIso,
+    dueDateIso,
+    receivingDateDual: formatDualDate(receivingDateIso),
+    dueDateDual: formatDualDate(dueDateIso),
+    daysUntilDue,
+    isOverdue: daysUntilDue < 0,
+    isDueToday: daysUntilDue === 0,
+    isDueSoon: daysUntilDue > 0 && daysUntilDue <= 3,
+    cycleMonthLabel,
+  };
+}
+
+

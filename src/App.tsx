@@ -20,10 +20,12 @@ import { IncomeView } from './components/IncomeView';
 import { ReportsView } from './components/ReportsView';
 import { SettingsView } from './components/SettingsView';
 import { WorkloadEarningsCalculator } from './components/WorkloadEarningsCalculator';
+import { StudentModeView } from './components/StudentModeView';
 
 const MainContent: React.FC = () => {
   const {
     activeTab,
+    appMode,
     isDarkMode,
     isResetModalOpen,
     closeResetModal,
@@ -40,6 +42,14 @@ const MainContent: React.FC = () => {
   }, [isDarkMode]);
 
   const renderActiveView = () => {
+    // If user is in Student Mode, show StudentModeView (or Settings if navigated there)
+    if (appMode === 'student') {
+      if (activeTab === 'settings') {
+        return <SettingsView />;
+      }
+      return <StudentModeView />;
+    }
+
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard />;

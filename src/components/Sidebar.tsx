@@ -16,6 +16,9 @@ import {
   Clock,
   AlertCircle,
   Sliders,
+  School,
+  Sparkles,
+  BookOpen,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -38,12 +41,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onCloseMobile })
     openAuthModal,
     syncStatus,
     isSyncing,
+    appMode,
+    setAppMode,
+    studentProfile,
+    studentClasses,
+    studentExams,
   } = useApp();
 
   const isOpen = isMobileOpen !== undefined ? isMobileOpen : isSidebarOpen;
   const handleClose = onCloseMobile || closeSidebar;
 
-  const navItems = [
+  const teacherNavItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     {
       id: 'students',
@@ -78,6 +86,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onCloseMobile })
     { id: 'reports', label: 'Reports & Export', icon: FileSpreadsheet },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
+
+  const studentNavItems = [
+    {
+      id: 'student_hub',
+      label: 'Student Workspace',
+      icon: GraduationCap,
+      badge: `${studentClasses.length} classes`,
+      badgeColor: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
+    },
+    { id: 'settings', label: 'Settings', icon: Settings },
+  ];
+
+  const navItems = appMode === 'student' ? studentNavItems : teacherNavItems;
 
   const handleSelectTab = (tabId: string) => {
     setActiveTab(tabId);
@@ -122,8 +143,83 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onCloseMobile })
           </button>
         </div>
 
-        {/* Teacher Profile Summary Card in Sidebar */}
+        {/* Mode Switcher inside Sidebar */}
+        <div className="px-3 pt-3">
+          <div className="p-1 rounded-xl bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 flex items-center gap-1 shadow-2xs">
+            <button
+              id="sidebar-btn-mode-teacher"
+              type="button"
+              onClick={() => setAppMode('teacher')}
+              className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
+                appMode === 'teacher'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <School className="w-3.5 h-3.5" />
+              <span>Teacher</span>
+            </button>
+            <button
+              id="sidebar-btn-mode-student"
+              type="button"
+              onClick={() => setAppMode('student')}
+              className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
+                appMode === 'student'
+                  ? 'bg-purple-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <GraduationCap className="w-3.5 h-3.5" />
+              <span>Student</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Profile Summary Card in Sidebar (Teacher vs Student) */}
         {(() => {
+          if (appMode === 'student') {
+            const studentDisplayName = studentProfile?.studentName || 'Student';
+            const initials = studentDisplayName
+              .split(' ')
+              .filter(Boolean)
+              .map((n) => n[0])
+              .slice(0, 2)
+              .join('')
+              .toUpperCase() || 'S';
+
+            return (
+              <div
+                id="sidebar-student-profile"
+                className="p-3 m-3 rounded-2xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200/80 dark:border-purple-800/40 transition"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="relative shrink-0">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-600 text-white font-bold text-sm flex items-center justify-center shadow-xs">
+                      {initials}
+                    </div>
+                    <span
+                      className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-purple-500 border-2 border-white dark:border-slate-900 shadow-xs"
+                      title="Student Mode Active"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-1">
+                      <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                        {studentDisplayName}
+                      </p>
+                      <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300">
+                        Class {studentProfile?.grade || '11'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                      {studentProfile?.schoolName || 'School & Tuition Hub'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
           const teacherDisplayName = currentUser?.displayName || settings.teacherName || 'Teacher';
           const teacherPhoto = currentUser?.photoURL;
           const initials = teacherDisplayName

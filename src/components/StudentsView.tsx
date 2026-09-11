@@ -86,7 +86,10 @@ export const StudentsView: React.FC = () => {
     feeStructure: 'monthly',
     feeAmount: 10000,
     paymentMethod: 'eSewa',
-    paymentDueDay: 10,
+    paymentCalendarSystem: 'BS',
+    paymentReceivingDay: 1,
+    dueDays: 5,
+    paymentDueDay: 6,
     notes: '',
     status: 'active',
   };
@@ -149,7 +152,10 @@ export const StudentsView: React.FC = () => {
       feeStructure: student.feeStructure,
       feeAmount: student.feeAmount,
       paymentMethod: student.paymentMethod,
-      paymentDueDay: student.paymentDueDay,
+      paymentCalendarSystem: student.paymentCalendarSystem || 'BS',
+      paymentReceivingDay: student.paymentReceivingDay || 1,
+      dueDays: student.dueDays !== undefined ? student.dueDays : 5,
+      paymentDueDay: student.paymentDueDay || ((student.paymentReceivingDay || 1) + (student.dueDays !== undefined ? student.dueDays : 5)),
       notes: student.notes || '',
       status: student.status,
     });
@@ -893,21 +899,103 @@ export const StudentsView: React.FC = () => {
                       <option value="Other">Other</option>
                     </select>
                   </div>
+                </div>
 
-                  <div>
-                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      Due Day (1-31)
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={31}
-                      value={formData.paymentDueDay}
-                      onChange={(e) =>
-                        setFormData({ ...formData, paymentDueDay: Number(e.target.value) })
-                      }
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
-                    />
+                {/* Payment Schedule Settings */}
+                <div className="mt-3 p-3.5 rounded-xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-900/60 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-purple-900 dark:text-purple-200 flex items-center gap-1.5">
+                      <CreditCard className="w-3.5 h-3.5 text-purple-600" />
+                      Tuition Payment Schedule & Due Notification
+                    </span>
+                    <span className="text-[11px] text-purple-600 dark:text-purple-400 font-medium">
+                      Calculates automatic fee due alerts
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Calendar System
+                      </label>
+                      <select
+                        value={formData.paymentCalendarSystem || 'BS'}
+                        onChange={(e) => {
+                          const newCal = e.target.value as 'BS' | 'AD';
+                          const maxDay = newCal === 'BS' ? 32 : 31;
+                          const curRec = formData.paymentReceivingDay || 1;
+                          const clampedRec = Math.min(curRec, maxDay);
+                          const due = clampedRec + (formData.dueDays !== undefined ? formData.dueDays : 5);
+                          setFormData({
+                            ...formData,
+                            paymentCalendarSystem: newCal,
+                            paymentReceivingDay: clampedRec,
+                            paymentDueDay: due,
+                          });
+                        }}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-medium focus:outline-none"
+                      >
+                        <option value="BS">Bikram Sambat (BS - Nepali Month)</option>
+                        <option value="AD">Gregorian (AD - English Month)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Receiving Day ({formData.paymentCalendarSystem === 'BS' ? '1 to 32 BS' : '1 to 31 AD'})
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={formData.paymentCalendarSystem === 'BS' ? 32 : 31}
+                        value={formData.paymentReceivingDay || 1}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          const max = formData.paymentCalendarSystem === 'BS' ? 32 : 31;
+                          const clamped = Math.max(1, Math.min(val || 1, max));
+                          const dueDaysVal = formData.dueDays !== undefined ? formData.dueDays : 5;
+                          setFormData({
+                            ...formData,
+                            paymentReceivingDay: clamped,
+                            paymentDueDay: clamped + dueDaysVal,
+                          });
+                        }}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Due Days (Grace Period)
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={30}
+                        value={formData.dueDays !== undefined ? formData.dueDays : 5}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          const dueDaysVal = Math.max(0, Math.min(val || 0, 30));
+                          const recDay = formData.paymentReceivingDay || 1;
+                          setFormData({
+                            ...formData,
+                            dueDays: dueDaysVal,
+                            paymentDueDay: recDay + dueDaysVal,
+                          });
+                        }}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Calculated summary badge */}
+                  <div className="p-2 rounded-lg bg-white dark:bg-slate-900/80 border border-purple-200/70 dark:border-purple-800 text-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                    <span className="text-slate-600 dark:text-slate-300">
+                      Fee billing on <strong>Day {formData.paymentReceivingDay || 1}</strong> of every {formData.paymentCalendarSystem === 'BS' ? 'Nepali month (BS)' : 'month (AD)'}
+                    </span>
+                    <span className="font-bold text-purple-700 dark:text-purple-300 flex items-center gap-1">
+                      Payment Due: Day {(formData.paymentReceivingDay || 1) + (formData.dueDays !== undefined ? formData.dueDays : 5)} (+{formData.dueDays !== undefined ? formData.dueDays : 5} days)
+                    </span>
                   </div>
                 </div>
 

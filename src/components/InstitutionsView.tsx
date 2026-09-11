@@ -23,7 +23,7 @@ import {
   CalendarCheck,
 } from 'lucide-react';
 import { formatCurrency, exportToCsv } from '../utils/formatters';
-import { formatDisplayDate, getTodayIso } from '../utils/nepaliCalendar';
+import { formatDisplayDate, getTodayIso, formatDualDate, calculatePaymentSchedule } from '../utils/nepaliCalendar';
 
 const DAYS_OF_WEEK: DayOfWeek[] = [
   'Sunday',
@@ -78,6 +78,10 @@ export const InstitutionsView: React.FC = () => {
     rateAmount: 35000,
     extraClassRate: 900,
     startDate: getTodayIso(),
+    paymentCalendarSystem: 'BS',
+    paymentReceivingDay: 1,
+    dueDays: 5,
+    paymentDueDay: 6,
     contactPerson: '',
     contactNumber: '',
     notes: '',
@@ -159,6 +163,10 @@ export const InstitutionsView: React.FC = () => {
       extraClassRate: inst.extraClassRate || 0,
       startDate: inst.startDate,
       endDate: inst.endDate || '',
+      paymentCalendarSystem: inst.paymentCalendarSystem || 'BS',
+      paymentReceivingDay: inst.paymentReceivingDay || 1,
+      dueDays: inst.dueDays !== undefined ? inst.dueDays : 5,
+      paymentDueDay: inst.paymentDueDay || ((inst.paymentReceivingDay || 1) + (inst.dueDays !== undefined ? inst.dueDays : 5)),
       contactPerson: inst.contactPerson || '',
       contactNumber: inst.contactNumber || '',
       notes: inst.notes || '',
@@ -468,9 +476,14 @@ export const InstitutionsView: React.FC = () => {
                           }`}
                         />
                       </div>
-                      <p className="text-xs text-purple-600 dark:text-purple-400 font-semibold mt-0.5">
-                        {inst.facultyOrGrade} {inst.section ? `• ${inst.section}` : ''}
-                      </p>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
+                        <p className="text-xs text-purple-600 dark:text-purple-400 font-semibold">
+                          {inst.facultyOrGrade} {inst.section ? `• ${inst.section}` : ''}
+                        </p>
+                        <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                          • Contract: <strong className="text-purple-700 dark:text-purple-300 font-semibold">{formatDisplayDate(inst.startDate, settings.dateSystem)} ({formatDisplayDate(inst.startDate, settings.dateSystem === 'BS' ? 'AD' : 'BS', 'short')})</strong>
+                        </span>
+                      </div>
                     </div>
 
                     <span className="px-2.5 py-1 text-xs font-extrabold rounded-lg bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">
@@ -496,7 +509,17 @@ export const InstitutionsView: React.FC = () => {
                     <div className="flex items-center justify-between">
                       <span className="text-slate-500">Contract Started:</span>
                       <span className="font-bold text-purple-600 dark:text-purple-400">
-                        {formatDisplayDate(inst.startDate, settings.calendarMode)}
+                        {formatDisplayDate(inst.startDate, settings.dateSystem)}
+                        <span className="ml-1 text-[11px] font-normal text-slate-400">
+                          ({formatDisplayDate(inst.startDate, settings.dateSystem === 'BS' ? 'AD' : 'BS', 'short')} {settings.dateSystem === 'BS' ? 'AD' : 'BS'})
+                        </span>
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">Salary Receiving Day:</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">
+                        Day {inst.paymentReceivingDay || 1} ({inst.paymentCalendarSystem || 'BS'}) • Due +{inst.dueDays !== undefined ? inst.dueDays : 5}d (Day {(inst.paymentDueDay || ((inst.paymentReceivingDay || 1) + (inst.dueDays !== undefined ? inst.dueDays : 5)))})
                       </span>
                     </div>
 
@@ -1136,15 +1159,123 @@ export const InstitutionsView: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      Contract Start Date
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                        <Calendar className="w-3.5 h-3.5 text-purple-500" />
+                        Contract Start Date *
+                      </label>
+                      {formData.startDate && (
+                        <span className="text-[10px] font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/60 px-2 py-0.5 rounded border border-purple-200/60 dark:border-purple-900/60">
+                          {formatDisplayDate(formData.startDate, settings.dateSystem)}
+                          {settings.dateSystem === 'AD' && ` • ${formatDisplayDate(formData.startDate, 'BS', 'short')} BS`}
+                          {settings.dateSystem === 'BS' && ` • ${formatDisplayDate(formData.startDate, 'AD', 'short')} AD`}
+                        </span>
+                      )}
+                    </div>
                     <input
                       type="date"
                       value={formData.startDate}
                       onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                       className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                     />
+                  </div>
+                </div>
+
+                {/* Salary / Payment Schedule Settings */}
+                <div className="mt-3 p-3.5 rounded-xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-900/60 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-purple-900 dark:text-purple-200 flex items-center gap-1.5">
+                      <CreditCard className="w-3.5 h-3.5 text-purple-600" />
+                      Salary / Payment Schedule & Due Notification
+                    </span>
+                    <span className="text-[11px] text-purple-600 dark:text-purple-400 font-medium">
+                      Calculates automatic due alerts
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Calendar System
+                      </label>
+                      <select
+                        value={formData.paymentCalendarSystem || 'BS'}
+                        onChange={(e) => {
+                          const newCal = e.target.value as 'BS' | 'AD';
+                          const maxDay = newCal === 'BS' ? 32 : 31;
+                          const curRec = formData.paymentReceivingDay || 1;
+                          const clampedRec = Math.min(curRec, maxDay);
+                          const due = clampedRec + (formData.dueDays !== undefined ? formData.dueDays : 5);
+                          setFormData({
+                            ...formData,
+                            paymentCalendarSystem: newCal,
+                            paymentReceivingDay: clampedRec,
+                            paymentDueDay: due,
+                          });
+                        }}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-medium focus:outline-none"
+                      >
+                        <option value="BS">Bikram Sambat (BS - Nepali Month)</option>
+                        <option value="AD">Gregorian (AD - English Month)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Receiving Day ({formData.paymentCalendarSystem === 'BS' ? '1 to 32 BS' : '1 to 31 AD'})
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={formData.paymentCalendarSystem === 'BS' ? 32 : 31}
+                        value={formData.paymentReceivingDay || 1}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          const max = formData.paymentCalendarSystem === 'BS' ? 32 : 31;
+                          const clamped = Math.max(1, Math.min(val || 1, max));
+                          const dueDaysVal = formData.dueDays !== undefined ? formData.dueDays : 5;
+                          setFormData({
+                            ...formData,
+                            paymentReceivingDay: clamped,
+                            paymentDueDay: clamped + dueDaysVal,
+                          });
+                        }}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Due Days (Grace Period)
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={30}
+                        value={formData.dueDays !== undefined ? formData.dueDays : 5}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          const dueDaysVal = Math.max(0, Math.min(val || 0, 30));
+                          const recDay = formData.paymentReceivingDay || 1;
+                          setFormData({
+                            ...formData,
+                            dueDays: dueDaysVal,
+                            paymentDueDay: recDay + dueDaysVal,
+                          });
+                        }}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Calculated summary badge */}
+                  <div className="p-2 rounded-lg bg-white dark:bg-slate-900/80 border border-purple-200/70 dark:border-purple-800 text-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                    <span className="text-slate-600 dark:text-slate-300">
+                      Salary received on <strong>Day {formData.paymentReceivingDay || 1}</strong> of every {formData.paymentCalendarSystem === 'BS' ? 'Nepali month (BS)' : 'month (AD)'}
+                    </span>
+                    <span className="font-bold text-purple-700 dark:text-purple-300 flex items-center gap-1">
+                      Payment Due: Day {(formData.paymentReceivingDay || 1) + (formData.dueDays !== undefined ? formData.dueDays : 5)} (+{formData.dueDays !== undefined ? formData.dueDays : 5} days)
+                    </span>
                   </div>
                 </div>
               </div>

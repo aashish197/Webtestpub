@@ -12,6 +12,10 @@ import {
   DateSystem,
   AttendanceStatus,
   AuthUser,
+  AppMode,
+  StudentClassItem,
+  StudentExamMark,
+  StudentRoutineSettings,
 } from '../types';
 import {
   INITIAL_SETTINGS,
@@ -21,8 +25,11 @@ import {
   INITIAL_ATTENDANCE,
   INITIAL_PAYMENTS,
   INITIAL_PERFORMANCE,
+  INITIAL_STUDENT_PROFILE,
+  INITIAL_STUDENT_CLASSES,
+  INITIAL_STUDENT_EXAMS,
 } from '../utils/sampleData';
-import { getTodayIso, adToBs } from '../utils/nepaliCalendar';
+import { getTodayIso, adToBs, formatDualDate, calculatePaymentSchedule } from '../utils/nepaliCalendar';
 import { calculateGrade } from '../utils/formatters';
 import { resolveClassSchedule } from '../utils/scheduleHelpers';
 import {
@@ -132,6 +139,22 @@ interface AppContextType {
   markNotificationAsRead: (id: string) => void;
   clearAllNotifications: () => void;
 
+  // Student Mode State & Operations
+  appMode: AppMode;
+  setAppMode: (mode: AppMode) => void;
+  studentClasses: StudentClassItem[];
+  addStudentClass: (cls: Omit<StudentClassItem, 'id'>) => StudentClassItem;
+  updateStudentClass: (id: string, data: Partial<StudentClassItem>) => void;
+  deleteStudentClass: (id: string) => void;
+
+  studentExams: StudentExamMark[];
+  addStudentExam: (exam: Omit<StudentExamMark, 'id' | 'createdAt'>) => StudentExamMark;
+  updateStudentExam: (id: string, data: Partial<StudentExamMark>) => void;
+  deleteStudentExam: (id: string) => void;
+
+  studentProfile: StudentRoutineSettings;
+  updateStudentProfile: (profile: Partial<StudentRoutineSettings>) => void;
+
   // Computed Properties & Summaries
   todayClasses: TeachingClass[];
   todayDayName: DayOfWeek;
@@ -160,6 +183,10 @@ const STORAGE_KEYS = {
   PAYMENTS: 'tcm_payments_v1',
   PERFORMANCE: 'tcm_performance_v1',
   DISMISSED_NOTIFICATIONS: 'tcm_dismissed_notifs_v1',
+  APP_MODE: 'tcm_app_mode_v1',
+  STUDENT_CLASSES: 'tcm_student_classes_v1',
+  STUDENT_EXAMS: 'tcm_student_exams_v1',
+  STUDENT_PROFILE: 'tcm_student_profile_v1',
 };
 
 export const sanitizeInstitution = (inst: Institution): Institution => {
@@ -319,6 +346,43 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   });
 
+  // Student Mode States
+  const [appMode, setAppMode] = useState<AppMode>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.APP_MODE);
+      return (saved === 'student' || saved === 'teacher') ? saved : 'teacher';
+    } catch {
+      return 'teacher';
+    }
+  });
+
+  const [studentClasses, setStudentClasses] = useState<StudentClassItem[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.STUDENT_CLASSES);
+      return saved ? JSON.parse(saved) : INITIAL_STUDENT_CLASSES;
+    } catch {
+      return INITIAL_STUDENT_CLASSES;
+    }
+  });
+
+  const [studentExams, setStudentExams] = useState<StudentExamMark[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.STUDENT_EXAMS);
+      return saved ? JSON.parse(saved) : INITIAL_STUDENT_EXAMS;
+    } catch {
+      return INITIAL_STUDENT_EXAMS;
+    }
+  });
+
+  const [studentProfile, setStudentProfile] = useState<StudentRoutineSettings>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.STUDENT_PROFILE);
+      return saved ? { ...INITIAL_STUDENT_PROFILE, ...JSON.parse(saved) } : INITIAL_STUDENT_PROFILE;
+    } catch {
+      return INITIAL_STUDENT_PROFILE;
+    }
+  });
+
   // System theme listener
   const [systemPrefersDark, setSystemPrefersDark] = useState<boolean>(() => {
     if (typeof window !== 'undefined' && window.matchMedia) {
@@ -378,6 +442,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.DISMISSED_NOTIFICATIONS, JSON.stringify(dismissedNotifIds));
   }, [dismissedNotifIds]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.APP_MODE, appMode);
+  }, [appMode]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.STUDENT_CLASSES, JSON.stringify(studentClasses));
+  }, [studentClasses]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.STUDENT_EXAMS, JSON.stringify(studentExams));
+  }, [studentExams]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.STUDENT_PROFILE, JSON.stringify(studentProfile));
+  }, [studentProfile]);
 
   // Firebase Auth listener and Cloud sync
   useEffect(() => {
@@ -584,8 +664,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     // Also optionally generate initial payment pending record
     const today = new Date();
     const currentMonthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-    const dueDay = String(studentData.paymentDueDay || 10).padStart(2, '0');
-    const dueDateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${dueDay}`;
+    const recDay = studentData.paymentReceivingDay || studentData.paymentDueDay || 10;
+    const graceDays = studentData.dueDays !== undefined ? studentData.dueDays : 5;
+    const calSys = studentData.paymentCalendarSystem || (settings.calendarMode || settings.dateSystem) || 'BS';
+    const schedule = calculatePaymentSchedule(recDay, graceDays, calSys);
+    const dueDateStr = schedule.dueDateIso;
 
     if (studentData.feeAmount > 0) {
       const initialAmount = studentData.feeStructure === 'hourly'
@@ -837,6 +920,50 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setPerformance(prev => prev.filter(p => p.id !== id));
   };
 
+  // Student Mode Actions
+  const addStudentClass = (cls: Omit<StudentClassItem, 'id'>): StudentClassItem => {
+    const newClass: StudentClassItem = {
+      ...cls,
+      id: `s-cls-${Date.now()}`,
+    };
+    setStudentClasses(prev => [...prev, newClass]);
+    return newClass;
+  };
+
+  const updateStudentClass = (id: string, data: Partial<StudentClassItem>) => {
+    setStudentClasses(prev =>
+      prev.map(c => (c.id === id ? { ...c, ...data } : c))
+    );
+  };
+
+  const deleteStudentClass = (id: string) => {
+    setStudentClasses(prev => prev.filter(c => c.id !== id));
+  };
+
+  const addStudentExam = (exam: Omit<StudentExamMark, 'id' | 'createdAt'>): StudentExamMark => {
+    const newExam: StudentExamMark = {
+      ...exam,
+      id: `s-exam-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+    };
+    setStudentExams(prev => [newExam, ...prev]);
+    return newExam;
+  };
+
+  const updateStudentExam = (id: string, data: Partial<StudentExamMark>) => {
+    setStudentExams(prev =>
+      prev.map(e => (e.id === id ? { ...e, ...data } : e))
+    );
+  };
+
+  const deleteStudentExam = (id: string) => {
+    setStudentExams(prev => prev.filter(e => e.id !== id));
+  };
+
+  const updateStudentProfile = (profile: Partial<StudentRoutineSettings>) => {
+    setStudentProfile(prev => ({ ...prev, ...profile }));
+  };
+
   // Notifications
   const markNotificationAsRead = (id: string) => {
     setDismissedNotifIds(prev => [...prev, id]);
@@ -973,16 +1100,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const notifications: NotificationItem[] = useMemo(() => {
     const items: NotificationItem[] = [];
     const todayIso = getTodayIso();
+    const reminderWindow = settings.reminderDaysBeforeDue || 3;
 
-    // 1. Overdue payments
+    // 1. Overdue payments (Tuition & College)
     overduePayments.forEach(p => {
       const notifId = `notif-overdue-${p.id}`;
       if (!dismissedNotifIds.includes(notifId)) {
+        const dualDate = p.dueDate ? formatDualDate(p.dueDate) : 'earlier this month';
         items.push({
           id: notifId,
           type: 'payment_overdue',
           title: `Overdue Fee: ${p.targetName}`,
-          message: `Pending balance of Rs. ${p.remainingBalance.toLocaleString()} was due on ${p.dueDate || 'earlier this month'}.`,
+          message: `Pending balance of Rs. ${p.remainingBalance.toLocaleString()} was due on ${dualDate}.`,
           date: p.dueDate || todayIso,
           priority: 'high',
           actionLink: 'payments',
@@ -991,7 +1120,172 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
     });
 
-    // 2. Pending attendance for today's classes
+    // 2. Payments Due Today or Due Soon (within reminder window)
+    payments.forEach(p => {
+      if (p.status === 'paid' || p.remainingBalance <= 0 || !p.dueDate) return;
+      if (p.dueDate === todayIso) {
+        const notifId = `notif-due-today-${p.id}`;
+        if (!dismissedNotifIds.includes(notifId)) {
+          items.push({
+            id: notifId,
+            type: 'payment_due_soon',
+            title: `Payment Due Today: ${p.targetName}`,
+            message: `Fee of Rs. ${p.remainingBalance.toLocaleString()} is due today (${formatDualDate(p.dueDate)}).`,
+            date: p.dueDate,
+            priority: 'high',
+            actionLink: 'payments',
+            isRead: false,
+          });
+        }
+      } else if (p.dueDate > todayIso) {
+        const dueTime = new Date(p.dueDate + 'T12:00:00').getTime();
+        const todayTime = new Date(todayIso + 'T12:00:00').getTime();
+        const daysLeft = Math.round((dueTime - todayTime) / (1000 * 60 * 60 * 24));
+        if (daysLeft > 0 && daysLeft <= reminderWindow) {
+          const notifId = `notif-due-soon-${p.id}`;
+          if (!dismissedNotifIds.includes(notifId)) {
+            items.push({
+              id: notifId,
+              type: 'payment_due_soon',
+              title: `Payment Due Soon: ${p.targetName}`,
+              message: `Fee of Rs. ${p.remainingBalance.toLocaleString()} is due in ${daysLeft} day(s) on ${formatDualDate(p.dueDate)}.`,
+              date: p.dueDate,
+              priority: 'medium',
+              actionLink: 'payments',
+              isRead: false,
+            });
+          }
+        }
+      }
+    });
+
+    // 3. College Contract Salary Due / Overdue Notifications
+    const today = new Date();
+    const currentMonthIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    institutions.filter(inst => inst.status === 'active').forEach(inst => {
+      const recDay = inst.paymentReceivingDay || inst.paymentDueDay || 1;
+      const graceDays = inst.dueDays !== undefined ? inst.dueDays : 5;
+      const calSys = inst.paymentCalendarSystem || (settings.calendarMode || settings.dateSystem) || 'BS';
+      const schedule = calculatePaymentSchedule(recDay, graceDays, calSys);
+
+      // Check if salary record already exists for this institution in current month
+      const isPaidThisMonth = payments.some(
+        p => p.institutionId === inst.id &&
+             (p.periodMonthYear === currentMonthIso || p.paymentDate?.startsWith(currentMonthIso)) &&
+             p.status === 'paid'
+      );
+
+      if (!isPaidThisMonth) {
+        const estAmount = inst.rateAmount || 0;
+        if (schedule.dueDateIso < todayIso) {
+          const notifId = `notif-inst-overdue-${inst.id}-${currentMonthIso}`;
+          if (!dismissedNotifIds.includes(notifId)) {
+            items.push({
+              id: notifId,
+              type: 'payment_overdue',
+              title: `College Salary Overdue: ${inst.name}`,
+              message: `Monthly salary of Rs. ${estAmount.toLocaleString()} (${schedule.cycleMonthLabel}) was due on ${schedule.dueDateDual}.`,
+              date: schedule.dueDateIso,
+              priority: 'high',
+              actionLink: 'institutions',
+              isRead: false,
+            });
+          }
+        } else if (schedule.dueDateIso === todayIso) {
+          const notifId = `notif-inst-today-${inst.id}-${currentMonthIso}`;
+          if (!dismissedNotifIds.includes(notifId)) {
+            items.push({
+              id: notifId,
+              type: 'payment_due_soon',
+              title: `College Salary Due Today: ${inst.name}`,
+              message: `Monthly salary of Rs. ${estAmount.toLocaleString()} (${schedule.cycleMonthLabel}) is due today (${schedule.dueDateDual}).`,
+              date: schedule.dueDateIso,
+              priority: 'high',
+              actionLink: 'institutions',
+              isRead: false,
+            });
+          }
+        } else if (schedule.daysUntilDue > 0 && schedule.daysUntilDue <= reminderWindow) {
+          const notifId = `notif-inst-soon-${inst.id}-${currentMonthIso}`;
+          if (!dismissedNotifIds.includes(notifId)) {
+            items.push({
+              id: notifId,
+              type: 'payment_due_soon',
+              title: `College Salary Due Soon: ${inst.name}`,
+              message: `Monthly salary of Rs. ${estAmount.toLocaleString()} is due in ${schedule.daysUntilDue} day(s) on ${schedule.dueDateDual}.`,
+              date: schedule.dueDateIso,
+              priority: 'medium',
+              actionLink: 'institutions',
+              isRead: false,
+            });
+          }
+        }
+      }
+    });
+
+    // 3.5 Student Tuition Fee Due / Overdue Notifications
+    students.filter(std => std.status === 'active').forEach(std => {
+      const recDay = std.paymentReceivingDay || std.paymentDueDay || 10;
+      const graceDays = std.dueDays !== undefined ? std.dueDays : 5;
+      const calSys = std.paymentCalendarSystem || (settings.calendarMode || settings.dateSystem) || 'BS';
+      const schedule = calculatePaymentSchedule(recDay, graceDays, calSys);
+
+      // Check if student has paid for this cycle
+      const isPaidThisMonth = payments.some(
+        p => p.studentId === std.id &&
+             (p.periodMonthYear === currentMonthIso || p.paymentDate?.startsWith(currentMonthIso)) &&
+             p.status === 'paid'
+      );
+
+      if (!isPaidThisMonth) {
+        const estAmount = std.feeAmount || 0;
+        if (schedule.dueDateIso < todayIso) {
+          const notifId = `notif-std-overdue-${std.id}-${currentMonthIso}`;
+          if (!dismissedNotifIds.includes(notifId)) {
+            items.push({
+              id: notifId,
+              type: 'payment_overdue',
+              title: `Tuition Fee Overdue: ${std.name}`,
+              message: `Fee of Rs. ${estAmount.toLocaleString()} (${schedule.cycleMonthLabel}) was due on ${schedule.dueDateDual}.`,
+              date: schedule.dueDateIso,
+              priority: 'high',
+              actionLink: 'payments',
+              isRead: false,
+            });
+          }
+        } else if (schedule.dueDateIso === todayIso) {
+          const notifId = `notif-std-today-${std.id}-${currentMonthIso}`;
+          if (!dismissedNotifIds.includes(notifId)) {
+            items.push({
+              id: notifId,
+              type: 'payment_due_soon',
+              title: `Tuition Fee Due Today: ${std.name}`,
+              message: `Fee of Rs. ${estAmount.toLocaleString()} (${schedule.cycleMonthLabel}) is due today (${schedule.dueDateDual}).`,
+              date: schedule.dueDateIso,
+              priority: 'high',
+              actionLink: 'payments',
+              isRead: false,
+            });
+          }
+        } else if (schedule.daysUntilDue > 0 && schedule.daysUntilDue <= reminderWindow) {
+          const notifId = `notif-std-soon-${std.id}-${currentMonthIso}`;
+          if (!dismissedNotifIds.includes(notifId)) {
+            items.push({
+              id: notifId,
+              type: 'payment_due_soon',
+              title: `Tuition Fee Due Soon: ${std.name}`,
+              message: `Fee of Rs. ${estAmount.toLocaleString()} is due in ${schedule.daysUntilDue} day(s) on ${schedule.dueDateDual}.`,
+              date: schedule.dueDateIso,
+              priority: 'medium',
+              actionLink: 'payments',
+              isRead: false,
+            });
+          }
+        }
+      }
+    });
+
+    // 4. Pending attendance for today's classes
     const recordedClassIdsToday = attendance.filter(a => a.date === todayIso).map(a => a.classId);
     const unrecordedClassesToday = todayClasses.filter(c => !recordedClassIdsToday.includes(c.id));
     if (unrecordedClassesToday.length > 0) {
@@ -1010,7 +1304,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
     }
 
-    // 3. Performance alerts (students who scored < 40%)
+    // 5. Performance alerts (students who scored < 40%)
     performance.forEach(perf => {
       if (perf.percentage < 40) {
         const notifId = `notif-perf-${perf.id}`;
@@ -1030,7 +1324,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     });
 
     return items;
-  }, [overduePayments, todayClasses, attendance, performance, dismissedNotifIds]);
+  }, [overduePayments, payments, institutions, settings, todayClasses, attendance, performance, dismissedNotifIds]);
 
   // Export Data JSON
   const exportDataJson = () => {
@@ -1362,6 +1656,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         notifications,
         markNotificationAsRead,
         clearAllNotifications,
+
+        // Student Mode State & Handlers
+        appMode,
+        setAppMode,
+        studentClasses,
+        addStudentClass,
+        updateStudentClass,
+        deleteStudentClass,
+        studentExams,
+        addStudentExam,
+        updateStudentExam,
+        deleteStudentExam,
+        studentProfile,
+        updateStudentProfile,
 
         todayClasses,
         todayDayName,

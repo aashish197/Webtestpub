@@ -32,6 +32,9 @@ export interface Student {
   feeAmount: number; // in NPR
   paymentMethod: PaymentMethod;
   paymentDueDay: number; // Day of month (1-31)
+  paymentCalendarSystem?: 'AD' | 'BS'; // Calendar used for payment schedule
+  paymentReceivingDay?: number; // Day number of month when payment is received (1-31 for AD, 1-32 for BS)
+  dueDays?: number; // Days allowed after receiving day until payment is due
   attendancePercentage?: number;
   pendingBalance?: number;
   notes?: string;
@@ -73,6 +76,10 @@ export interface Institution {
   extraClassRate?: number; // e.g. 1000 / period
   startDate: string;
   endDate?: string;
+  paymentCalendarSystem?: 'AD' | 'BS';
+  paymentReceivingDay?: number; // 1-31 (AD) or 1-32 (BS)
+  dueDays?: number; // Days allowed after receiving day until payment is due
+  paymentDueDay?: number;
   contactPerson?: string;
   contactNumber?: string;
   notes?: string;
@@ -249,4 +256,59 @@ export interface NotificationItem {
   priority: 'low' | 'medium' | 'high';
   actionLink?: string;
   isRead: boolean;
+}
+
+export type AppMode = 'teacher' | 'student';
+
+export interface StudentClassItem {
+  id: string;
+  type: 'school' | 'tuition';
+  subject: string;
+  teacherOrInstitute: string; // e.g. "St. Xavier's School" or "Prof. Ramesh (Math Tuition)"
+  scheduleDays: DayOfWeek[];
+  startTime: string; // 'HH:MM'
+  endTime: string; // 'HH:MM'
+  durationMinutes: number;
+  location?: string;
+  color?: string;
+  notes?: string;
+  isActive: boolean;
+}
+
+export interface StudentExamMark {
+  id: string;
+  examType: 'terminal_exam' | 'unit_test' | 'pre_board' | 'quiz';
+  termName: string; // e.g. 'First Terminal Examination', 'Unit Test 1', 'Second Term'
+  subject: string;
+  date: string; // 'YYYY-MM-DD'
+  fullMarks: number;
+  passMarks: number;
+  obtainedMarks: number;
+  percentage: number;
+  grade: string;
+  weakTopics?: string[];
+  strongTopics?: string[];
+  remarks?: string;
+  aiFeedback?: string;
+  createdAt: string;
+}
+
+export interface StudentRoutineSettings {
+  studentName: string;
+  grade: string;
+  schoolName: string;
+  targetWakeUpTime: string; // e.g. '06:00'
+  targetBedTime: string; // e.g. '22:30'
+  targetDailySelfStudyHours: number; // e.g. 3 hours
+  examGoals?: string; // e.g. "Score > 85% in SEE / +2 Board"
+}
+
+export interface StudentAISuggestion {
+  id: string;
+  type: 'free_time' | 'exam_feedback' | 'routine_balance' | 'study_tip';
+  title: string;
+  message: string;
+  actionText?: string;
+  tags?: string[];
+  createdAt: string;
 }

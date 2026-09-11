@@ -10,7 +10,9 @@ import {
   CreditCard,
   Trash2,
   ExternalLink,
+  CalendarClock,
 } from 'lucide-react';
+import { formatDualDate } from '../utils/nepaliCalendar';
 
 export const NotificationDrawer: React.FC = () => {
   const {
@@ -36,6 +38,8 @@ export const NotificationDrawer: React.FC = () => {
     switch (type) {
       case 'payment_overdue':
         return <AlertTriangle className="w-4 h-4 text-rose-600" />;
+      case 'payment_due_soon':
+        return <CalendarClock className="w-4 h-4 text-amber-500" />;
       case 'attendance_pending':
         return <UserCheck className="w-4 h-4 text-amber-600" />;
       case 'performance_alert':
@@ -119,8 +123,8 @@ export const NotificationDrawer: React.FC = () => {
                         <h4 className="text-xs font-bold text-slate-900 dark:text-white truncate">
                           {notif.title}
                         </h4>
-                        <span className="text-[10px] text-slate-400 shrink-0">
-                          {notif.date}
+                        <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 shrink-0">
+                          {notif.date.includes('-') && notif.date.length === 10 ? formatDualDate(notif.date, 'compact') : notif.date}
                         </span>
                       </div>
                       <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">

@@ -7,6 +7,9 @@ import {
   CreditCard,
   Menu,
   Plus,
+  GraduationCap,
+  School,
+  Settings,
 } from 'lucide-react';
 
 export const MobileBottomNav: React.FC = () => {
@@ -17,7 +20,66 @@ export const MobileBottomNav: React.FC = () => {
     openQuickAction,
     classesScheduledTodayCount,
     overduePayments,
+    appMode,
+    setAppMode,
   } = useApp();
+
+  if (appMode === 'student') {
+    return (
+      <nav
+        id="mobile-bottom-navigation-student"
+        aria-label="Student Mobile Navigation"
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-t border-slate-200 dark:border-slate-800 px-3 py-1.5 shadow-lg flex items-center justify-around"
+      >
+        <button
+          id="btn-bottom-tab-student-hub"
+          onClick={() => setActiveTab('student_hub')}
+          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${
+            activeTab !== 'settings'
+              ? 'text-purple-600 dark:text-purple-400 font-bold'
+              : 'text-slate-500 dark:text-slate-400'
+          }`}
+        >
+          <GraduationCap className="w-5 h-5 stroke-[2.2px]" />
+          <span className="text-[10px] tracking-tight mt-0.5 whitespace-nowrap">Study Hub</span>
+        </button>
+
+        <button
+          id="btn-bottom-switch-teacher"
+          type="button"
+          onClick={() => setAppMode('teacher')}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-600 text-white font-bold text-xs shadow-md shadow-indigo-600/30 active:scale-95 transition"
+          title="Switch to Teacher Mode"
+        >
+          <School className="w-4 h-4" />
+          <span>Teacher Mode</span>
+        </button>
+
+        <button
+          id="btn-bottom-tab-student-settings"
+          onClick={() => setActiveTab('settings')}
+          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${
+            activeTab === 'settings'
+              ? 'text-purple-600 dark:text-purple-400 font-bold'
+              : 'text-slate-500 dark:text-slate-400'
+          }`}
+        >
+          <Settings className="w-5 h-5 stroke-[1.8px]" />
+          <span className="text-[10px] tracking-tight mt-0.5 whitespace-nowrap">Settings</span>
+        </button>
+
+        <button
+          id="btn-bottom-student-drawer"
+          onClick={toggleSidebar}
+          className="flex flex-col items-center justify-center py-1 px-3 rounded-xl text-slate-500 dark:text-slate-400 hover:text-purple-600 transition"
+          aria-label="Open sidebar"
+        >
+          <Menu className="w-5 h-5 stroke-[1.8px]" />
+          <span className="text-[10px] tracking-tight mt-0.5 whitespace-nowrap">Menu</span>
+        </button>
+      </nav>
+    );
+  }
 
   return (
     <nav

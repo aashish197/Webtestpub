@@ -85,7 +85,45 @@ const TAB_CONFIG: Record<
 };
 
 export const ViewHeaderNav: React.FC = () => {
-  const { activeTab, setActiveTab, toggleSidebar } = useApp();
+  const { activeTab, setActiveTab, toggleSidebar, appMode, setAppMode } = useApp();
+
+  if (appMode === 'student') {
+    return (
+      <div className="mb-6 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 p-2.5 sm:px-4 sm:py-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={toggleSidebar}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 text-xs font-bold transition shadow-2xs hover:bg-purple-100"
+              title="Open Navigation Menu"
+            >
+              <Menu className="w-3.5 h-3.5" />
+              <span>Menu</span>
+            </button>
+
+            <ChevronRight className="w-3.5 h-3.5 text-slate-400 hidden sm:inline" />
+
+            {/* Current Page Badge */}
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50/70 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 text-xs font-semibold">
+              <GraduationCap className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+              <span>Student Learning & AI Hub</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              id="btn-nav-switch-to-teacher"
+              onClick={() => setAppMode('teacher')}
+              className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/80 text-indigo-700 dark:text-indigo-300 text-xs font-bold transition flex items-center gap-1.5 shadow-2xs active:scale-95"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Switch to Teacher Mode</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const currentConfig = TAB_CONFIG[activeTab] || TAB_CONFIG.dashboard;
   const Icon = currentConfig.icon;
