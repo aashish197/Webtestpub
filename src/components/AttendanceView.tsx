@@ -347,7 +347,7 @@ export const AttendanceView: React.FC = () => {
             <input
               type="text"
               placeholder="Search target, topics covered..."
-              value={search}
+              value={search || ''}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
             />
@@ -357,7 +357,7 @@ export const AttendanceView: React.FC = () => {
           <div>
             <input
               type="date"
-              value={dateFilter}
+              value={dateFilter || ''}
               onChange={(e) => setDateFilter(e.target.value)}
               className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
             />
@@ -366,7 +366,7 @@ export const AttendanceView: React.FC = () => {
           {/* Student or College Target */}
           <div>
             <select
-              value={studentOrInstFilter}
+              value={studentOrInstFilter || 'ALL'}
               onChange={(e) => setStudentOrInstFilter(e.target.value)}
               className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
             >
@@ -391,7 +391,7 @@ export const AttendanceView: React.FC = () => {
           {/* Status Filter */}
           <div>
             <select
-              value={statusFilter}
+              value={statusFilter || 'ALL'}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
             >
@@ -545,7 +545,7 @@ export const AttendanceView: React.FC = () => {
                   <input
                     type="date"
                     required
-                    value={formData.date}
+                    value={formData.date || ''}
                     onChange={(e) => {
                       const newDate = e.target.value;
                       const cls = classes.find((c) => c.id === formData.classId);
@@ -572,7 +572,7 @@ export const AttendanceView: React.FC = () => {
                     Status *
                   </label>
                   <select
-                    value={formData.status}
+                    value={formData.status || 'present'}
                     onChange={(e) =>
                       setFormData({ ...formData, status: e.target.value as AttendanceStatus })
                     }
@@ -612,7 +612,7 @@ export const AttendanceView: React.FC = () => {
                   })()}
                 </div>
                 <select
-                  value={formData.classId}
+                  value={formData.classId || ''}
                   onChange={(e) => {
                     const cls = classes.find((c) => c.id === e.target.value);
                     if (cls) {
@@ -658,7 +658,7 @@ export const AttendanceView: React.FC = () => {
                   <input
                     type="text"
                     required
-                    value={formData.subject}
+                    value={formData.subject || ''}
                     onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                   />
@@ -702,7 +702,7 @@ export const AttendanceView: React.FC = () => {
                     type="number"
                     min={5}
                     step={1}
-                    value={formData.durationMinutes}
+                    value={formData.durationMinutes ?? 45}
                     onChange={(e) =>
                       setFormData({ ...formData, durationMinutes: Number(e.target.value) })
                     }
@@ -718,7 +718,7 @@ export const AttendanceView: React.FC = () => {
                 <input
                   type="text"
                   placeholder="e.g. Cross products, L'Hopital Rule, Compound angles"
-                  value={formData.topicsCovered}
+                  value={formData.topicsCovered || ''}
                   onChange={(e) => setFormData({ ...formData, topicsCovered: e.target.value })}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                 />
@@ -731,7 +731,7 @@ export const AttendanceView: React.FC = () => {
                 <textarea
                   rows={2}
                   placeholder="e.g. Completed chapter 3 numerical problems"
-                  value={formData.notes}
+                  value={formData.notes || ''}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                 />

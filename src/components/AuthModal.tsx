@@ -435,7 +435,7 @@ export const AuthModal: React.FC = () => {
                       <input
                         type="text"
                         required
-                        value={displayName}
+                        value={displayName || ''}
                         onChange={(e) => setDisplayName(e.target.value)}
                         placeholder="e.g. Aashish Kumar"
                         className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
@@ -456,7 +456,7 @@ export const AuthModal: React.FC = () => {
                     <input
                       type="email"
                       required
-                      value={email}
+                      value={email || ''}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="teacher@example.com"
                       className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
@@ -488,7 +488,7 @@ export const AuthModal: React.FC = () => {
                       <input
                         type={showPassword ? 'text' : 'password'}
                         required
-                        value={password}
+                        value={password || ''}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="••••••••"
                         minLength={6}
@@ -519,7 +519,7 @@ export const AuthModal: React.FC = () => {
                       <input
                         type={showPassword ? 'text' : 'password'}
                         required
-                        value={confirmPassword}
+                        value={confirmPassword || ''}
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         placeholder="••••••••"
                         minLength={6}

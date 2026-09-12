@@ -912,7 +912,7 @@ export const WorkloadEarningsCalculator: React.FC = () => {
                     min={300}
                     max={5000}
                     step={100}
-                    value={simHourlyRate}
+                    value={simHourlyRate ?? 1000}
                     onChange={(e) => setSimHourlyRate(Number(e.target.value))}
                     className="w-full accent-indigo-600"
                   />
@@ -936,7 +936,7 @@ export const WorkloadEarningsCalculator: React.FC = () => {
                     min={1}
                     max={10}
                     step={0.5}
-                    value={simHoursPerDay}
+                    value={simHoursPerDay ?? 3}
                     onChange={(e) => setSimHoursPerDay(Number(e.target.value))}
                     className="w-full accent-indigo-600"
                   />
@@ -960,7 +960,7 @@ export const WorkloadEarningsCalculator: React.FC = () => {
                     min={1}
                     max={7}
                     step={1}
-                    value={simDaysPerWeek}
+                    value={simDaysPerWeek ?? 6}
                     onChange={(e) => setSimDaysPerWeek(Number(e.target.value))}
                     className="w-full accent-indigo-600"
                   />
@@ -986,7 +986,7 @@ export const WorkloadEarningsCalculator: React.FC = () => {
                     min={1}
                     max={15}
                     step={1}
-                    value={simStudentsCount}
+                    value={simStudentsCount ?? 4}
                     onChange={(e) => setSimStudentsCount(Number(e.target.value))}
                     className="w-full accent-teal-600"
                   />
@@ -1005,7 +1005,7 @@ export const WorkloadEarningsCalculator: React.FC = () => {
                     min={4000}
                     max={30000}
                     step={1000}
-                    value={simMonthlyPerStudent}
+                    value={simMonthlyPerStudent ?? 8000}
                     onChange={(e) => setSimMonthlyPerStudent(Number(e.target.value))}
                     className="w-full accent-teal-600"
                   />
@@ -1024,7 +1024,7 @@ export const WorkloadEarningsCalculator: React.FC = () => {
                     min={0}
                     max={120000}
                     step={2500}
-                    value={simCollegeSalary}
+                    value={simCollegeSalary ?? 35000}
                     onChange={(e) => setSimCollegeSalary(Number(e.target.value))}
                     className="w-full accent-purple-600"
                   />

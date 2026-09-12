@@ -238,7 +238,7 @@ export const PerformanceView: React.FC = () => {
             <input
               type="text"
               placeholder="Search by student, test, subject, weak area..."
-              value={search}
+              value={search || ''}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
             />
@@ -246,7 +246,7 @@ export const PerformanceView: React.FC = () => {
 
           <div>
             <select
-              value={studentFilter}
+              value={studentFilter || 'ALL'}
               onChange={(e) => setStudentFilter(e.target.value)}
               className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
             >
@@ -261,7 +261,7 @@ export const PerformanceView: React.FC = () => {
 
           <div>
             <select
-              value={testTypeFilter}
+              value={testTypeFilter || 'ALL'}
               onChange={(e) => setTestTypeFilter(e.target.value)}
               className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
             >
@@ -433,7 +433,7 @@ export const PerformanceView: React.FC = () => {
                     Student *
                   </label>
                   <select
-                    value={formData.studentId}
+                    value={formData.studentId || ''}
                     onChange={(e) => {
                       const st = students.find((s) => s.id === e.target.value);
                       if (st) {
@@ -462,7 +462,7 @@ export const PerformanceView: React.FC = () => {
                   <input
                     type="text"
                     required
-                    value={formData.subject}
+                    value={formData.subject || ''}
                     onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                   />
@@ -478,7 +478,7 @@ export const PerformanceView: React.FC = () => {
                     type="text"
                     required
                     placeholder="e.g. Unit Test 2 or First Term"
-                    value={formData.testName}
+                    value={formData.testName || ''}
                     onChange={(e) => setFormData({ ...formData, testName: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                   />
@@ -489,7 +489,7 @@ export const PerformanceView: React.FC = () => {
                     Assessment Type
                   </label>
                   <select
-                    value={formData.testType}
+                    value={formData.testType || 'unit_test'}
                     onChange={(e) =>
                       setFormData({ ...formData, testType: e.target.value as TestType })
                     }
@@ -512,7 +512,7 @@ export const PerformanceView: React.FC = () => {
                   <input
                     type="number"
                     min={1}
-                    value={formData.totalMarks}
+                    value={formData.totalMarks ?? 100}
                     onChange={(e) =>
                       handleMarksChange(Number(e.target.value), formData.obtainedMarks)
                     }
@@ -527,7 +527,7 @@ export const PerformanceView: React.FC = () => {
                   <input
                     type="number"
                     min={0}
-                    value={formData.obtainedMarks}
+                    value={formData.obtainedMarks ?? 0}
                     onChange={(e) =>
                       handleMarksChange(formData.totalMarks, Number(e.target.value))
                     }
@@ -567,7 +567,7 @@ export const PerformanceView: React.FC = () => {
                   </label>
                   <input
                     type="date"
-                    value={formData.date}
+                    value={formData.date || ''}
                     onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                   />
@@ -578,7 +578,7 @@ export const PerformanceView: React.FC = () => {
                     Homework Status
                   </label>
                   <select
-                    value={formData.assignmentStatus}
+                    value={formData.assignmentStatus || 'completed'}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
@@ -601,7 +601,7 @@ export const PerformanceView: React.FC = () => {
                 <input
                   type="text"
                   placeholder="e.g. Thermodynamics, Linear Equations"
-                  value={formData.topicsCovered}
+                  value={formData.topicsCovered || ''}
                   onChange={(e) => setFormData({ ...formData, topicsCovered: e.target.value })}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                 />
@@ -614,7 +614,7 @@ export const PerformanceView: React.FC = () => {
                 <input
                   type="text"
                   placeholder="e.g. Word problem interpretation, trigonometric transformations"
-                  value={formData.weakAreas}
+                  value={formData.weakAreas || ''}
                   onChange={(e) => setFormData({ ...formData, weakAreas: e.target.value })}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                 />
@@ -627,7 +627,7 @@ export const PerformanceView: React.FC = () => {
                 <textarea
                   rows={2}
                   placeholder="Feedback on student focus, homework consistency, progress..."
-                  value={formData.teacherRemarks}
+                  value={formData.teacherRemarks || ''}
                   onChange={(e) => setFormData({ ...formData, teacherRemarks: e.target.value })}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                 />

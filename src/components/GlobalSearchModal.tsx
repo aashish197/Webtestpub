@@ -255,7 +255,7 @@ export const GlobalSearchModal: React.FC = () => {
             id="input-spotlight-search"
             type="text"
             placeholder="Search students, classes, payments, colleges, actions..."
-            value={localQuery}
+            value={localQuery || ''}
             onChange={(e) => setLocalQuery(e.target.value)}
             className="flex-1 bg-transparent text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 text-sm sm:text-base focus:outline-none"
           />

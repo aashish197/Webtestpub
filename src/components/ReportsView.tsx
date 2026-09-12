@@ -184,7 +184,7 @@ export const ReportsView: React.FC = () => {
             </label>
             <input
               type="date"
-              value={dateFrom}
+              value={dateFrom || ''}
               onChange={(e) => setDateFrom(e.target.value)}
               className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
             />
@@ -196,7 +196,7 @@ export const ReportsView: React.FC = () => {
             </label>
             <input
               type="date"
-              value={dateTo}
+              value={dateTo || ''}
               onChange={(e) => setDateTo(e.target.value)}
               className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
             />

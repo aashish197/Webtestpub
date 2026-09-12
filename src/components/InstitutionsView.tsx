@@ -378,7 +378,7 @@ export const InstitutionsView: React.FC = () => {
           <input
             type="text"
             placeholder="Search by college name, faculty, subjects..."
-            value={search}
+            value={search || ''}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
           />
@@ -689,7 +689,7 @@ export const InstitutionsView: React.FC = () => {
                     type="text"
                     required
                     placeholder="e.g. Kathmandu Model College (KMC)"
-                    value={formData.name}
+                    value={formData.name || ''}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                   />
@@ -703,7 +703,7 @@ export const InstitutionsView: React.FC = () => {
                     type="text"
                     required
                     placeholder="e.g. +2 Science (Grade 12) or B.Sc. CSIT"
-                    value={formData.facultyOrGrade}
+                    value={formData.facultyOrGrade || ''}
                     onChange={(e) =>
                       setFormData({ ...formData, facultyOrGrade: e.target.value })
                     }
@@ -720,7 +720,7 @@ export const InstitutionsView: React.FC = () => {
                   <input
                     type="text"
                     placeholder="e.g. Section B (Morning)"
-                    value={formData.section}
+                    value={formData.section || ''}
                     onChange={(e) => setFormData({ ...formData, section: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                   />
@@ -731,7 +731,7 @@ export const InstitutionsView: React.FC = () => {
                     Institution Status
                   </label>
                   <select
-                    value={formData.status}
+                    value={formData.status || 'active'}
                     onChange={(e) =>
                       setFormData({ ...formData, status: e.target.value as any })
                     }
@@ -752,7 +752,7 @@ export const InstitutionsView: React.FC = () => {
                   <input
                     type="text"
                     placeholder="Type subject (e.g. Calculus, Modern Physics) and press Add"
-                    value={subjectInput}
+                    value={subjectInput || ''}
                     onChange={(e) => setSubjectInput(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
@@ -1035,7 +1035,7 @@ export const InstitutionsView: React.FC = () => {
                       Payment Structure
                     </label>
                     <select
-                      value={formData.paymentStructure}
+                      value={formData.paymentStructure || 'monthly'}
                       onChange={(e) =>
                         setFormData({
                           ...formData,
@@ -1059,7 +1059,7 @@ export const InstitutionsView: React.FC = () => {
                       type="number"
                       required
                       min={0}
-                      value={formData.rateAmount}
+                      value={formData.rateAmount ?? 0}
                       onChange={(e) =>
                         setFormData({ ...formData, rateAmount: Number(e.target.value) })
                       }
@@ -1081,7 +1081,7 @@ export const InstitutionsView: React.FC = () => {
                         type="number"
                         min={1}
                         max={10}
-                        value={formData.numberOfPeriods}
+                        value={formData.numberOfPeriods ?? 1}
                         onChange={(e) => {
                           const val = Math.max(1, Number(e.target.value));
                           const synced: Record<DayOfWeek, number> = {
@@ -1130,7 +1130,7 @@ export const InstitutionsView: React.FC = () => {
                       type="number"
                       min={5}
                       step={1}
-                      value={formData.periodDurationMinutes}
+                      value={formData.periodDurationMinutes ?? 45}
                       onChange={(e) =>
                         setFormData({
                           ...formData,
@@ -1150,7 +1150,7 @@ export const InstitutionsView: React.FC = () => {
                     <input
                       type="number"
                       min={0}
-                      value={formData.extraClassRate}
+                      value={formData.extraClassRate ?? 0}
                       onChange={(e) =>
                         setFormData({ ...formData, extraClassRate: Number(e.target.value) })
                       }
@@ -1174,7 +1174,7 @@ export const InstitutionsView: React.FC = () => {
                     </div>
                     <input
                       type="date"
-                      value={formData.startDate}
+                      value={formData.startDate || ''}
                       onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                       className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                     />
@@ -1252,7 +1252,7 @@ export const InstitutionsView: React.FC = () => {
                         type="number"
                         min={0}
                         max={30}
-                        value={formData.dueDays !== undefined ? formData.dueDays : 5}
+                        value={formData.dueDays ?? 5}
                         onChange={(e) => {
                           const val = Number(e.target.value);
                           const dueDaysVal = Math.max(0, Math.min(val || 0, 30));
@@ -1289,7 +1289,7 @@ export const InstitutionsView: React.FC = () => {
                   <input
                     type="text"
                     placeholder="e.g. Dr. Ramesh (Principal)"
-                    value={formData.contactPerson}
+                    value={formData.contactPerson || ''}
                     onChange={(e) =>
                       setFormData({ ...formData, contactPerson: e.target.value })
                     }
@@ -1304,7 +1304,7 @@ export const InstitutionsView: React.FC = () => {
                   <input
                     type="text"
                     placeholder="+977 1 4..."
-                    value={formData.contactNumber}
+                    value={formData.contactNumber || ''}
                     onChange={(e) =>
                       setFormData({ ...formData, contactNumber: e.target.value })
                     }

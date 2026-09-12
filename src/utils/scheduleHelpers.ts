@@ -85,7 +85,34 @@ export function resolveClassSchedule(
     }
   }
 
-  // 2. If day is not in scheduleDays, return not scheduled
+  // 2. Check for day-wise schedule
+  if (cls.scheduleType === 'day_wise' && cls.dayWiseSchedules && cls.dayWiseSchedules[day]) {
+    const dayConfig = cls.dayWiseSchedules[day]!;
+    // If explicitly marked inactive, not scheduled
+    if (dayConfig.isActive === false) {
+      return {
+        startTime: dayConfig.startTime || cls.startTime || '07:00',
+        endTime: dayConfig.endTime || cls.endTime || '08:00',
+        durationMinutes: dayConfig.durationMinutes || cls.durationMinutes || 60,
+        isScheduled: false,
+        isDateOverride: false,
+        note: dayConfig.note,
+      };
+    }
+    // If marked active or in scheduleDays
+    if (dayConfig.isActive === true || cls.scheduleDays.includes(day)) {
+      return {
+        startTime: dayConfig.startTime,
+        endTime: dayConfig.endTime,
+        durationMinutes: dayConfig.durationMinutes || cls.durationMinutes || 60,
+        isScheduled: true,
+        isDateOverride: false,
+        note: dayConfig.note,
+      };
+    }
+  }
+
+  // 3. If day is not in scheduleDays, return not scheduled
   if (!cls.scheduleDays.includes(day)) {
     return {
       startTime: cls.startTime || '07:00',
@@ -93,19 +120,6 @@ export function resolveClassSchedule(
       durationMinutes: cls.durationMinutes || 60,
       isScheduled: false,
       isDateOverride: false,
-    };
-  }
-
-  // 3. Check for day-wise schedule
-  if (cls.scheduleType === 'day_wise' && cls.dayWiseSchedules && cls.dayWiseSchedules[day]) {
-    const dayConfig = cls.dayWiseSchedules[day]!;
-    return {
-      startTime: dayConfig.startTime,
-      endTime: dayConfig.endTime,
-      durationMinutes: dayConfig.durationMinutes || cls.durationMinutes || 60,
-      isScheduled: true,
-      isDateOverride: false,
-      note: dayConfig.note,
     };
   }
 

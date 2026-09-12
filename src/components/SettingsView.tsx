@@ -44,13 +44,23 @@ export const SettingsView: React.FC = () => {
     logout,
   } = useApp();
 
-  const [formData, setFormData] = useState<TeacherSettings>({ ...settings });
+  const sanitizeSettings = (s: TeacherSettings): TeacherSettings => ({
+    ...s,
+    teacherName: s.teacherName || '',
+    phone: s.phone || '',
+    email: s.email || '',
+    address: s.address || '',
+    bio: s.bio || '',
+    reminderTemplate: s.reminderTemplate || '',
+  });
+
+  const [formData, setFormData] = useState<TeacherSettings>(() => sanitizeSettings(settings));
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState(false);
 
   useEffect(() => {
-    setFormData({ ...settings });
+    setFormData(sanitizeSettings(settings));
   }, [settings]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -217,7 +227,7 @@ export const SettingsView: React.FC = () => {
               <input
                 type="text"
                 required
-                value={formData.teacherName}
+                value={formData.teacherName || ''}
                 onChange={(e) => setFormData({ ...formData, teacherName: e.target.value })}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
               />
@@ -230,7 +240,7 @@ export const SettingsView: React.FC = () => {
               <input
                 type="text"
                 required
-                value={formData.phone}
+                value={formData.phone || ''}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
               />
@@ -242,7 +252,7 @@ export const SettingsView: React.FC = () => {
               </label>
               <input
                 type="email"
-                value={formData.email}
+                value={formData.email || ''}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
               />
@@ -254,7 +264,7 @@ export const SettingsView: React.FC = () => {
               </label>
               <input
                 type="text"
-                value={formData.address}
+                value={formData.address || ''}
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
               />
@@ -266,7 +276,7 @@ export const SettingsView: React.FC = () => {
               </label>
               <input
                 type="text"
-                value={formData.bio}
+                value={formData.bio || ''}
                 onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
                 placeholder="e.g. Senior Faculty of Mathematics & Physics (M.Sc.)"
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
@@ -290,7 +300,7 @@ export const SettingsView: React.FC = () => {
                 Date System (AD / BS)
               </label>
               <select
-                value={formData.dateSystem}
+                value={formData.dateSystem || 'BS'}
                 onChange={(e) =>
                   setFormData({ ...formData, dateSystem: e.target.value as DateSystem })
                 }
@@ -309,7 +319,7 @@ export const SettingsView: React.FC = () => {
                 Currency
               </label>
               <select
-                value={formData.currency}
+                value={formData.currency || 'NPR'}
                 onChange={(e) =>
                   setFormData({ ...formData, currency: e.target.value as CurrencyCode })
                 }
@@ -328,7 +338,7 @@ export const SettingsView: React.FC = () => {
                 Time Format
               </label>
               <select
-                value={formData.timeFormat}
+                value={formData.timeFormat || '12h'}
                 onChange={(e) =>
                   setFormData({ ...formData, timeFormat: e.target.value as TimeFormat })
                 }
@@ -367,7 +377,7 @@ export const SettingsView: React.FC = () => {
                 type="number"
                 min={5}
                 step={1}
-                value={formData.defaultClassDuration}
+                value={formData.defaultClassDuration ?? 60}
                 onChange={(e) =>
                   setFormData({ ...formData, defaultClassDuration: Number(e.target.value) })
                 }
@@ -380,7 +390,7 @@ export const SettingsView: React.FC = () => {
                 Application Theme
               </label>
               <select
-                value={formData.theme}
+                value={formData.theme || 'system'}
                 onChange={(e) => {
                   const newTheme = e.target.value as 'light' | 'dark' | 'system';
                   setFormData({ ...formData, theme: newTheme });
@@ -411,7 +421,7 @@ export const SettingsView: React.FC = () => {
             </label>
             <textarea
               rows={4}
-              value={formData.reminderTemplate}
+              value={formData.reminderTemplate || ''}
               onChange={(e) => setFormData({ ...formData, reminderTemplate: e.target.value })}
               className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none font-mono text-[11px]"
             />

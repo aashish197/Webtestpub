@@ -360,7 +360,7 @@ export const ResetConfirmationModal: React.FC<ResetConfirmationModalProps> = ({
                 <input
                   type="text"
                   placeholder="Type RESET here"
-                  value={confirmText}
+                  value={confirmText || ''}
                   onChange={(e) => setConfirmText(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono uppercase tracking-wider focus:outline-none focus:ring-2 focus:ring-rose-500/20"
                 />

@@ -294,7 +294,7 @@ Thank you for your payment!`;
             <input
               type="text"
               placeholder="Search target, receipt number, note..."
-              value={search}
+              value={search || ''}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-9 pr-8 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
             />
@@ -311,7 +311,7 @@ Thank you for your payment!`;
 
           <div>
             <select
-              value={typeFilter}
+              value={typeFilter || 'ALL'}
               onChange={(e) => setTypeFilter(e.target.value as any)}
               className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
             >
@@ -323,7 +323,7 @@ Thank you for your payment!`;
 
           <div>
             <select
-              value={statusFilter}
+              value={statusFilter || 'ALL'}
               onChange={(e) => setStatusFilter(e.target.value as any)}
               className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
             >
@@ -564,7 +564,7 @@ Thank you for your payment!`;
                     Student *
                   </label>
                   <select
-                    value={formData.studentId}
+                    value={formData.studentId || ''}
                     onChange={(e) => {
                       const st = students.find((s) => s.id === e.target.value);
                       if (st) {
@@ -605,7 +605,7 @@ Thank you for your payment!`;
                     College / Institution *
                   </label>
                   <select
-                    value={formData.institutionId}
+                    value={formData.institutionId || ''}
                     onChange={(e) => {
                       const inst = institutions.find((i) => i.id === e.target.value);
                       if (inst) {
@@ -620,7 +620,7 @@ Thank you for your payment!`;
                           amountPaid: calculatedFee,
                           remainingBalance: 0,
                           referenceNote: inst.paymentStructure === 'hourly'
-                            ? `College salary (${inst.periodDurationMinutes || 60} mins @ ${formatCurrency(inst.rateAmount, settings.currency)}/hr)`
+                            ? `Lecture salary (${inst.periodDurationMinutes || 60} mins @ ${formatCurrency(inst.rateAmount, settings.currency)}/hr)`
                             : formData.referenceNote,
                         });
                       }
@@ -643,7 +643,7 @@ Thank you for your payment!`;
                   </label>
                   <input
                     type="month"
-                    value={formData.periodMonthYear}
+                    value={formData.periodMonthYear || ''}
                     onChange={(e) => setFormData({ ...formData, periodMonthYear: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                   />
@@ -654,7 +654,7 @@ Thank you for your payment!`;
                     Payment Method
                   </label>
                   <select
-                    value={formData.paymentMethod}
+                    value={formData.paymentMethod || 'eSewa'}
                     onChange={(e) =>
                       setFormData({ ...formData, paymentMethod: e.target.value as PaymentMethod })
                     }
@@ -679,7 +679,7 @@ Thank you for your payment!`;
                     type="number"
                     min={0}
                     required
-                    value={formData.amountDue}
+                    value={formData.amountDue ?? 0}
                     onChange={(e) =>
                       handleFormAmountChange(Number(e.target.value), formData.amountPaid)
                     }
@@ -695,7 +695,7 @@ Thank you for your payment!`;
                     type="number"
                     min={0}
                     required
-                    value={formData.amountPaid}
+                    value={formData.amountPaid ?? 0}
                     onChange={(e) =>
                       handleFormAmountChange(formData.amountDue, Number(e.target.value))
                     }
@@ -710,7 +710,7 @@ Thank you for your payment!`;
                   <input
                     type="number"
                     disabled
-                    value={formData.remainingBalance}
+                    value={formData.remainingBalance ?? 0}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-500"
                   />
                 </div>
@@ -723,7 +723,7 @@ Thank you for your payment!`;
                   </label>
                   <input
                     type="date"
-                    value={formData.paymentDate}
+                    value={formData.paymentDate || ''}
                     onChange={(e) => setFormData({ ...formData, paymentDate: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                   />
@@ -735,7 +735,7 @@ Thank you for your payment!`;
                   </label>
                   <input
                     type="date"
-                    value={formData.dueDate}
+                    value={formData.dueDate || ''}
                     onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                   />
@@ -749,7 +749,7 @@ Thank you for your payment!`;
                 <input
                   type="text"
                   placeholder="e.g. Transaction ID, Check # or Remarks"
-                  value={formData.referenceNote}
+                  value={formData.referenceNote || ''}
                   onChange={(e) => setFormData({ ...formData, referenceNote: e.target.value })}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                 />

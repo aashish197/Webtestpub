@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   BookOpen,
   School,
@@ -102,7 +102,31 @@ export const StudentModeView: React.FC = () => {
   const [strongInput, setStrongInput] = useState('');
 
   // Profile Form state
-  const [profileForm, setProfileForm] = useState<StudentRoutineSettings>(studentProfile);
+  const [profileForm, setProfileForm] = useState<StudentRoutineSettings>(() => ({
+    ...studentProfile,
+    studentName: studentProfile?.studentName || '',
+    grade: studentProfile?.grade || '',
+    schoolName: studentProfile?.schoolName || '',
+    examGoals: studentProfile?.examGoals || '',
+    targetBedTime: studentProfile?.targetBedTime || '22:30',
+    targetWakeUpTime: studentProfile?.targetWakeUpTime || '06:00',
+    targetDailySelfStudyHours: studentProfile?.targetDailySelfStudyHours ?? 3.5,
+  }));
+
+  useEffect(() => {
+    if (studentProfile) {
+      setProfileForm({
+        ...studentProfile,
+        studentName: studentProfile.studentName || '',
+        grade: studentProfile.grade || '',
+        schoolName: studentProfile.schoolName || '',
+        examGoals: studentProfile.examGoals || '',
+        targetBedTime: studentProfile.targetBedTime || '22:30',
+        targetWakeUpTime: studentProfile.targetWakeUpTime || '06:00',
+        targetDailySelfStudyHours: studentProfile.targetDailySelfStudyHours ?? 3.5,
+      });
+    }
+  }, [studentProfile]);
 
   // Time & Routine Calculations
   const timeCalculations = useMemo(() => {
@@ -1286,7 +1310,7 @@ export const StudentModeView: React.FC = () => {
                   type="text"
                   required
                   placeholder="e.g. Compulsory Mathematics"
-                  value={classForm.subject}
+                  value={classForm.subject || ''}
                   onChange={(e) => setClassForm({ ...classForm, subject: e.target.value })}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                 />
@@ -1299,7 +1323,7 @@ export const StudentModeView: React.FC = () => {
                 <input
                   type="text"
                   placeholder="e.g. St. Xavier's School (Mr. Karki) or Baneshwor Tuition"
-                  value={classForm.teacherOrInstitute}
+                  value={classForm.teacherOrInstitute || ''}
                   onChange={(e) => setClassForm({ ...classForm, teacherOrInstitute: e.target.value })}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                 />
@@ -1313,7 +1337,7 @@ export const StudentModeView: React.FC = () => {
                   </label>
                   <input
                     type="time"
-                    value={classForm.startTime}
+                    value={classForm.startTime || '09:00'}
                     onChange={(e) => setClassForm({ ...classForm, startTime: e.target.value })}
                     className="w-full px-2 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                   />
@@ -1324,7 +1348,7 @@ export const StudentModeView: React.FC = () => {
                   </label>
                   <input
                     type="time"
-                    value={classForm.endTime}
+                    value={classForm.endTime || '09:45'}
                     onChange={(e) => setClassForm({ ...classForm, endTime: e.target.value })}
                     className="w-full px-2 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                   />
@@ -1337,7 +1361,7 @@ export const StudentModeView: React.FC = () => {
                     type="number"
                     min={15}
                     step={5}
-                    value={classForm.durationMinutes}
+                    value={classForm.durationMinutes ?? 45}
                     onChange={(e) => setClassForm({ ...classForm, durationMinutes: Number(e.target.value) })}
                     className="w-full px-2 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                   />
@@ -1445,7 +1469,7 @@ export const StudentModeView: React.FC = () => {
                     Exam Category
                   </label>
                   <select
-                    value={examForm.examType}
+                    value={examForm.examType || 'terminal_exam'}
                     onChange={(e) => setExamForm({ ...examForm, examType: e.target.value as any })}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                   >
@@ -1464,7 +1488,7 @@ export const StudentModeView: React.FC = () => {
                     type="text"
                     required
                     placeholder="e.g. First Terminal or Unit Test 1"
-                    value={examForm.termName}
+                    value={examForm.termName || ''}
                     onChange={(e) => setExamForm({ ...examForm, termName: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                   />
@@ -1480,7 +1504,7 @@ export const StudentModeView: React.FC = () => {
                     type="text"
                     required
                     placeholder="e.g. Optional Mathematics"
-                    value={examForm.subject}
+                    value={examForm.subject || ''}
                     onChange={(e) => setExamForm({ ...examForm, subject: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                   />
@@ -1497,7 +1521,7 @@ export const StudentModeView: React.FC = () => {
                   </div>
                   <input
                     type="date"
-                    value={examForm.date}
+                    value={examForm.date || ''}
                     onChange={(e) => setExamForm({ ...examForm, date: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                   />
@@ -1513,7 +1537,7 @@ export const StudentModeView: React.FC = () => {
                   <input
                     type="number"
                     min={10}
-                    value={examForm.fullMarks}
+                    value={examForm.fullMarks ?? 100}
                     onChange={(e) => setExamForm({ ...examForm, fullMarks: Number(e.target.value) })}
                     className="w-full px-2.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                   />
@@ -1525,7 +1549,7 @@ export const StudentModeView: React.FC = () => {
                   <input
                     type="number"
                     min={5}
-                    value={examForm.passMarks}
+                    value={examForm.passMarks ?? 40}
                     onChange={(e) => setExamForm({ ...examForm, passMarks: Number(e.target.value) })}
                     className="w-full px-2.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                   />
@@ -1538,7 +1562,7 @@ export const StudentModeView: React.FC = () => {
                     type="number"
                     min={0}
                     max={examForm.fullMarks}
-                    value={examForm.obtainedMarks}
+                    value={examForm.obtainedMarks ?? 0}
                     onChange={(e) => setExamForm({ ...examForm, obtainedMarks: Number(e.target.value) })}
                     className="w-full px-2.5 py-2 rounded-xl border border-purple-300 dark:border-purple-700 bg-purple-50/50 dark:bg-purple-950/40 text-purple-900 dark:text-purple-100 font-bold focus:outline-none"
                   />
@@ -1564,7 +1588,7 @@ export const StudentModeView: React.FC = () => {
                   <input
                     type="text"
                     placeholder="e.g. Trigonometry compound angles"
-                    value={weakInput}
+                    value={weakInput || ''}
                     onChange={(e) => setWeakInput(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && weakInput.trim()) {
@@ -1612,7 +1636,7 @@ export const StudentModeView: React.FC = () => {
                   <input
                     type="text"
                     placeholder="e.g. Matrices, Sets"
-                    value={strongInput}
+                    value={strongInput || ''}
                     onChange={(e) => setStrongInput(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && strongInput.trim()) {
@@ -1709,7 +1733,7 @@ export const StudentModeView: React.FC = () => {
                 <input
                   type="text"
                   required
-                  value={profileForm.studentName}
+                  value={profileForm.studentName || ''}
                   onChange={(e) => setProfileForm({ ...profileForm, studentName: e.target.value })}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                 />
@@ -1722,7 +1746,7 @@ export const StudentModeView: React.FC = () => {
                   </label>
                   <input
                     type="text"
-                    value={profileForm.grade}
+                    value={profileForm.grade || ''}
                     onChange={(e) => setProfileForm({ ...profileForm, grade: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                   />
@@ -1736,7 +1760,7 @@ export const StudentModeView: React.FC = () => {
                     step={0.5}
                     min={1}
                     max={10}
-                    value={profileForm.targetDailySelfStudyHours}
+                    value={profileForm.targetDailySelfStudyHours ?? 3.5}
                     onChange={(e) => setProfileForm({ ...profileForm, targetDailySelfStudyHours: Number(e.target.value) })}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                   />
@@ -1750,7 +1774,7 @@ export const StudentModeView: React.FC = () => {
                   </label>
                   <input
                     type="time"
-                    value={profileForm.targetBedTime}
+                    value={profileForm.targetBedTime || '22:30'}
                     onChange={(e) => setProfileForm({ ...profileForm, targetBedTime: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                   />
@@ -1761,7 +1785,7 @@ export const StudentModeView: React.FC = () => {
                   </label>
                   <input
                     type="time"
-                    value={profileForm.targetWakeUpTime}
+                    value={profileForm.targetWakeUpTime || '06:00'}
                     onChange={(e) => setProfileForm({ ...profileForm, targetWakeUpTime: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                   />
@@ -1774,7 +1798,7 @@ export const StudentModeView: React.FC = () => {
                 </label>
                 <input
                   type="text"
-                  value={profileForm.schoolName}
+                  value={profileForm.schoolName || ''}
                   onChange={(e) => setProfileForm({ ...profileForm, schoolName: e.target.value })}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                 />

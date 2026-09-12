@@ -45,13 +45,13 @@ const PRESET_COLORS = [
 ];
 
 const DEFAULT_DAY_WISE_TIMES: Record<DayOfWeek, DayWiseClassSchedule> = {
-  Sunday: { startTime: '07:00', endTime: '08:30', durationMinutes: 90 },
-  Monday: { startTime: '16:00', endTime: '17:00', durationMinutes: 60 },
-  Tuesday: { startTime: '16:00', endTime: '17:00', durationMinutes: 60 },
-  Wednesday: { startTime: '16:00', endTime: '17:00', durationMinutes: 60 },
-  Thursday: { startTime: '16:00', endTime: '17:00', durationMinutes: 60 },
-  Friday: { startTime: '16:00', endTime: '17:00', durationMinutes: 60 },
-  Saturday: { startTime: '09:00', endTime: '11:00', durationMinutes: 120 },
+  Sunday: { day: 'Sunday', isActive: true, startTime: '07:00', endTime: '08:30', durationMinutes: 90 },
+  Monday: { day: 'Monday', isActive: false, startTime: '16:00', endTime: '17:00', durationMinutes: 60 },
+  Tuesday: { day: 'Tuesday', isActive: true, startTime: '16:00', endTime: '17:00', durationMinutes: 60 },
+  Wednesday: { day: 'Wednesday', isActive: false, startTime: '16:00', endTime: '17:00', durationMinutes: 60 },
+  Thursday: { day: 'Thursday', isActive: true, startTime: '16:00', endTime: '17:00', durationMinutes: 60 },
+  Friday: { day: 'Friday', isActive: false, startTime: '16:00', endTime: '17:00', durationMinutes: 60 },
+  Saturday: { day: 'Saturday', isActive: false, startTime: '09:00', endTime: '11:00', durationMinutes: 120 },
 };
 
 export const ClassesRoutineView: React.FC = () => {
@@ -117,11 +117,18 @@ export const ClassesRoutineView: React.FC = () => {
 
   const handleOpenAdd = () => {
     setEditingClass(null);
+    const dayWise: Record<DayOfWeek, DayWiseClassSchedule> = { ...DEFAULT_DAY_WISE_TIMES };
+    DAYS_OF_WEEK.forEach((d) => {
+      dayWise[d] = {
+        ...DEFAULT_DAY_WISE_TIMES[d],
+        isActive: initialFormState.scheduleDays.includes(d),
+      };
+    });
     setFormData({
       ...initialFormState,
       studentId: students[0]?.id || '',
       institutionId: institutions[0]?.id || '',
-      dayWiseSchedules: { ...DEFAULT_DAY_WISE_TIMES },
+      dayWiseSchedules: dayWise,
       dateSpecificSchedules: [],
     });
     setNewDateInput(getTodayIso());
@@ -132,18 +139,27 @@ export const ClassesRoutineView: React.FC = () => {
   const handleOpenEdit = (cls: TeachingClass) => {
     setEditingClass(cls);
 
-    const dayWise: Partial<Record<DayOfWeek, DayWiseClassSchedule>> = { ...DEFAULT_DAY_WISE_TIMES };
-    if (cls.dayWiseSchedules) {
-      Object.assign(dayWise, cls.dayWiseSchedules);
-    } else {
-      cls.scheduleDays.forEach((d) => {
-        dayWise[d] = {
-          startTime: cls.startTime,
-          endTime: cls.endTime,
-          durationMinutes: cls.durationMinutes,
-        };
-      });
-    }
+    const dayWise: Record<DayOfWeek, DayWiseClassSchedule> = { ...DEFAULT_DAY_WISE_TIMES };
+    DAYS_OF_WEEK.forEach((d) => {
+      const existing = cls.dayWiseSchedules?.[d];
+      const isActive = existing?.isActive !== undefined 
+        ? existing.isActive 
+        : cls.scheduleDays.includes(d);
+
+      dayWise[d] = {
+        day: d,
+        isActive,
+        startTime: existing?.startTime || cls.startTime || DEFAULT_DAY_WISE_TIMES[d].startTime,
+        endTime: existing?.endTime || cls.endTime || DEFAULT_DAY_WISE_TIMES[d].endTime,
+        durationMinutes: existing?.durationMinutes || cls.durationMinutes || DEFAULT_DAY_WISE_TIMES[d].durationMinutes,
+        location: existing?.location || cls.location,
+        note: existing?.note || '',
+      };
+    });
+
+    const activeDays = cls.scheduleType === 'day_wise'
+      ? DAYS_OF_WEEK.filter((d) => dayWise[d].isActive)
+      : [...cls.scheduleDays];
 
     setFormData({
       title: cls.title,
@@ -158,7 +174,7 @@ export const ClassesRoutineView: React.FC = () => {
       feeAmount: cls.feeAmount,
       durationMinutes: cls.durationMinutes,
       scheduleType: cls.scheduleType || (cls.dayWiseSchedules ? 'day_wise' : 'uniform'),
-      scheduleDays: [...cls.scheduleDays],
+      scheduleDays: activeDays.length > 0 ? activeDays : [...cls.scheduleDays],
       startTime: cls.startTime,
       endTime: cls.endTime,
       dayWiseSchedules: dayWise,
@@ -175,6 +191,8 @@ export const ClassesRoutineView: React.FC = () => {
 
   const handleUpdateDaySchedule = (day: DayOfWeek, updates: Partial<DayWiseClassSchedule>) => {
     const current = formData.dayWiseSchedules?.[day] || {
+      day,
+      isActive: formData.scheduleDays.includes(day),
       startTime: formData.startTime || '16:00',
       endTime: formData.endTime || '17:00',
       durationMinutes: formData.durationMinutes || 60,
@@ -192,8 +210,22 @@ export const ClassesRoutineView: React.FC = () => {
       }
     }
 
+    let updatedScheduleDays = [...formData.scheduleDays];
+    if (updates.isActive !== undefined) {
+      if (updates.isActive) {
+        if (!updatedScheduleDays.includes(day)) {
+          updatedScheduleDays = DAYS_OF_WEEK.filter(
+            (d) => d === day || updatedScheduleDays.includes(d)
+          );
+        }
+      } else {
+        updatedScheduleDays = updatedScheduleDays.filter((d) => d !== day);
+      }
+    }
+
     setFormData({
       ...formData,
+      scheduleDays: updatedScheduleDays,
       dayWiseSchedules: {
         ...formData.dayWiseSchedules,
         [day]: updated,
@@ -275,14 +307,37 @@ export const ClassesRoutineView: React.FC = () => {
       }
     }
 
+    let finalScheduleDays = [...formData.scheduleDays];
+    let finalDayWiseSchedules = formData.dayWiseSchedules;
+
+    if (formData.scheduleType === 'day_wise') {
+      const activeDays = DAYS_OF_WEEK.filter(
+        (d) => formData.dayWiseSchedules?.[d]?.isActive
+      );
+      finalScheduleDays = activeDays.length > 0 ? activeDays : formData.scheduleDays;
+
+      finalDayWiseSchedules = {};
+      DAYS_OF_WEEK.forEach((d) => {
+        const sched = formData.dayWiseSchedules?.[d];
+        const isActive = finalScheduleDays.includes(d);
+        finalDayWiseSchedules![d] = {
+          day: d,
+          isActive,
+          startTime: sched?.startTime || formData.startTime || '07:00',
+          endTime: sched?.endTime || formData.endTime || '08:00',
+          durationMinutes: sched?.durationMinutes || formData.durationMinutes || 60,
+        };
+      });
+    }
+
     // Determine fallback startTime/endTime from first active day if day-wise
     let fallbackStartTime = formData.startTime;
     let fallbackEndTime = formData.endTime;
     let fallbackDuration = formData.durationMinutes;
 
-    if (formData.scheduleType === 'day_wise' && formData.scheduleDays.length > 0) {
-      const firstDay = formData.scheduleDays[0];
-      const firstDayConfig = formData.dayWiseSchedules?.[firstDay];
+    if (formData.scheduleType === 'day_wise' && finalScheduleDays.length > 0) {
+      const firstDay = finalScheduleDays[0];
+      const firstDayConfig = finalDayWiseSchedules?.[firstDay];
       if (firstDayConfig) {
         fallbackStartTime = firstDayConfig.startTime;
         fallbackEndTime = firstDayConfig.endTime;
@@ -290,9 +345,11 @@ export const ClassesRoutineView: React.FC = () => {
       }
     }
 
-    const payload = {
+    const payload: Omit<TeachingClass, 'id'> = {
       ...formData,
       title: finalTitle,
+      scheduleDays: finalScheduleDays,
+      dayWiseSchedules: finalDayWiseSchedules,
       startTime: fallbackStartTime,
       endTime: fallbackEndTime,
       durationMinutes: fallbackDuration,
@@ -335,10 +392,19 @@ export const ClassesRoutineView: React.FC = () => {
     classes
       .filter((c) => c.isActive)
       .forEach((cls) => {
-        cls.scheduleDays.forEach((day) => {
+        const activeDays = cls.scheduleType === 'day_wise' && cls.dayWiseSchedules
+          ? DAYS_OF_WEEK.filter((d) => {
+              const sched = cls.dayWiseSchedules?.[d];
+              return sched?.isActive !== undefined ? sched.isActive : cls.scheduleDays.includes(d);
+            })
+          : cls.scheduleDays;
+
+        activeDays.forEach((day) => {
           if (map[day]) {
             const resolved = resolveClassSchedule(cls, day);
-            map[day].push({ cls, resolved });
+            if (resolved.isScheduled) {
+              map[day].push({ cls, resolved });
+            }
           }
         });
       });
@@ -868,7 +934,14 @@ export const ClassesRoutineView: React.FC = () => {
                       <div className="flex items-center justify-between">
                         <span className="text-slate-500">Active Days:</span>
                         <span className="font-semibold text-slate-800 dark:text-slate-200">
-                          {(cls.scheduleDays || []).map((d) => d.slice(0, 3)).join(', ') || 'None'}
+                          {isDayWise && cls.dayWiseSchedules
+                            ? DAYS_OF_WEEK.filter((d) => {
+                                const sc = cls.dayWiseSchedules?.[d];
+                                return sc?.isActive !== undefined ? sc.isActive : cls.scheduleDays.includes(d);
+                              })
+                                .map((d) => d.slice(0, 3))
+                                .join(', ') || 'None'
+                            : (cls.scheduleDays || []).map((d) => d.slice(0, 3)).join(', ') || 'None'}
                         </span>
                       </div>
 
@@ -880,16 +953,23 @@ export const ClassesRoutineView: React.FC = () => {
                           </span>
                         </div>
                       ) : (
-                        <div className="pt-1 border-t border-slate-200/50 dark:border-slate-700/50 space-y-1">
+                        <div className="pt-1 border-t border-slate-200/50 dark:border-slate-700/50 space-y-1.5">
                           <span className="text-[11px] font-semibold text-slate-500 block">Day Breakdown:</span>
-                          <div className="grid grid-cols-2 gap-1 text-[11px]">
-                            {cls.scheduleDays.map((d) => {
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px]">
+                            {DAYS_OF_WEEK.filter((d) => {
+                              const sc = cls.dayWiseSchedules?.[d];
+                              return sc?.isActive !== undefined ? sc.isActive : cls.scheduleDays.includes(d);
+                            }).map((d) => {
                               const daySch = cls.dayWiseSchedules?.[d];
+                              const startTimeStr = daySch?.startTime || cls.startTime;
+                              const endTimeStr = daySch?.endTime || cls.endTime;
+                              const durMins = daySch?.durationMinutes || cls.durationMinutes || 60;
                               return (
-                                <div key={d} className="flex justify-between bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">
-                                  <span className="font-medium text-slate-600 dark:text-slate-400">{d.slice(0, 3)}:</span>
-                                  <span className="font-bold text-slate-800 dark:text-slate-200">
-                                    {daySch ? formatTime(daySch.startTime, settings.timeFormat) : formatTime(cls.startTime, settings.timeFormat)}
+                                <div key={d} className="flex items-center justify-between bg-white dark:bg-slate-800 px-2 py-1 rounded border border-slate-200 dark:border-slate-700">
+                                  <span className="font-semibold text-slate-600 dark:text-slate-400">{d.slice(0, 3)}:</span>
+                                  <span className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1">
+                                    <span>{formatTime(startTimeStr, settings.timeFormat)} - {formatTime(endTimeStr, settings.timeFormat)}</span>
+                                    <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-medium">({durMins}m)</span>
                                   </span>
                                 </div>
                               );
@@ -986,7 +1066,7 @@ export const ClassesRoutineView: React.FC = () => {
                     Select Student *
                   </label>
                   <select
-                    value={formData.studentId}
+                    value={formData.studentId || ''}
                     onChange={(e) => {
                       const st = students.find((s) => s.id === e.target.value);
                       setFormData({
@@ -1012,7 +1092,7 @@ export const ClassesRoutineView: React.FC = () => {
                     Select College / Institution *
                   </label>
                   <select
-                    value={formData.institutionId}
+                    value={formData.institutionId || ''}
                     onChange={(e) => {
                       const inst = institutions.find((i) => i.id === e.target.value);
                       setFormData({
@@ -1043,7 +1123,7 @@ export const ClassesRoutineView: React.FC = () => {
                   <input
                     type="text"
                     placeholder="e.g. Aarav Sharma - Opt Math"
-                    value={formData.title}
+                    value={formData.title || ''}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                   />
@@ -1057,7 +1137,7 @@ export const ClassesRoutineView: React.FC = () => {
                     type="text"
                     required
                     placeholder="e.g. Optional Mathematics"
-                    value={formData.subject}
+                    value={formData.subject || ''}
                     onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                   />
@@ -1155,7 +1235,7 @@ export const ClassesRoutineView: React.FC = () => {
                         <input
                           type="time"
                           required
-                          value={formData.startTime}
+                          value={formData.startTime || '07:00'}
                           onChange={(e) => {
                             const newStart = e.target.value;
                             const newEnd = calculateEndTime(newStart, formData.durationMinutes);
@@ -1172,7 +1252,7 @@ export const ClassesRoutineView: React.FC = () => {
                         <input
                           type="time"
                           required
-                          value={formData.endTime}
+                          value={formData.endTime || '08:00'}
                           onChange={(e) => {
                             const newEnd = e.target.value;
                             const diff = calculateDurationMinutes(formData.startTime, newEnd);
@@ -1215,7 +1295,7 @@ export const ClassesRoutineView: React.FC = () => {
                           type="number"
                           min={5}
                           step={1}
-                          value={formData.durationMinutes}
+                          value={formData.durationMinutes ?? 60}
                           onChange={(e) => {
                             const dur = Number(e.target.value);
                             const newEnd = calculateEndTime(formData.startTime, dur);
@@ -1277,7 +1357,7 @@ export const ClassesRoutineView: React.FC = () => {
                                   <span className="text-[11px] text-slate-500">Start:</span>
                                   <input
                                     type="time"
-                                    value={sched.startTime}
+                                    value={sched.startTime || '07:00'}
                                     onChange={(e) => {
                                       const newStart = e.target.value;
                                       const newEnd = calculateEndTime(newStart, sched.durationMinutes);
@@ -1294,7 +1374,7 @@ export const ClassesRoutineView: React.FC = () => {
                                   <span className="text-[11px] text-slate-500">End:</span>
                                   <input
                                     type="time"
-                                    value={sched.endTime}
+                                    value={sched.endTime || '08:00'}
                                     onChange={(e) => {
                                       const newEnd = e.target.value;
                                       const diff = calculateDurationMinutes(sched.startTime, newEnd);
@@ -1345,7 +1425,7 @@ export const ClassesRoutineView: React.FC = () => {
                       </label>
                       <input
                         type="date"
-                        value={newOverrideDate}
+                        value={newOverrideDate || ''}
                         onChange={(e) => setNewOverrideDate(e.target.value)}
                         className="w-full px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white"
                       />
@@ -1356,7 +1436,7 @@ export const ClassesRoutineView: React.FC = () => {
                       </label>
                       <input
                         type="time"
-                        value={newOverrideStartTime}
+                        value={newOverrideStartTime || ''}
                         onChange={(e) => setNewOverrideStartTime(e.target.value)}
                         className="w-full px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white"
                       />
@@ -1367,7 +1447,7 @@ export const ClassesRoutineView: React.FC = () => {
                       </label>
                       <input
                         type="time"
-                        value={newOverrideEndTime}
+                        value={newOverrideEndTime || ''}
                         onChange={(e) => setNewOverrideEndTime(e.target.value)}
                         className="w-full px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white"
                       />
@@ -1379,7 +1459,7 @@ export const ClassesRoutineView: React.FC = () => {
                       <input
                         type="text"
                         placeholder="e.g. Model exam revision"
-                        value={newOverrideNote}
+                        value={newOverrideNote || ''}
                         onChange={(e) => setNewOverrideNote(e.target.value)}
                         className="w-full px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white"
                       />
@@ -1447,7 +1527,7 @@ export const ClassesRoutineView: React.FC = () => {
                   <input
                     type="text"
                     placeholder="e.g. Student Residence, Baneshwor or Room 302"
-                    value={formData.location}
+                    value={formData.location || ''}
                     onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                   />
@@ -1459,7 +1539,7 @@ export const ClassesRoutineView: React.FC = () => {
                   </label>
                   <input
                     type="date"
-                    value={formData.startDate}
+                    value={formData.startDate || ''}
                     onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                   />

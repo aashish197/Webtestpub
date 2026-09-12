@@ -584,7 +584,7 @@ export const QuickActionModal: React.FC = () => {
                     type="text"
                     required
                     placeholder="e.g. Aarav Sharma"
-                    value={studentData.name}
+                    value={studentData.name || ''}
                     onChange={(e) => setStudentData({ ...studentData, name: e.target.value })}
                     className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                   />
@@ -598,7 +598,7 @@ export const QuickActionModal: React.FC = () => {
                     type="text"
                     required
                     placeholder="e.g. Grade 10, +2 Science, BIM"
-                    value={studentData.grade}
+                    value={studentData.grade || ''}
                     onChange={(e) => setStudentData({ ...studentData, grade: e.target.value })}
                     className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                   />
@@ -611,7 +611,7 @@ export const QuickActionModal: React.FC = () => {
                   <input
                     type="text"
                     placeholder="e.g. Mathematics, Physics"
-                    value={studentData.subjects}
+                    value={studentData.subjects || ''}
                     onChange={(e) => setStudentData({ ...studentData, subjects: e.target.value })}
                     className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                   />
@@ -622,7 +622,7 @@ export const QuickActionModal: React.FC = () => {
                     Tuition Batch Type
                   </label>
                   <select
-                    value={studentData.tuitionType}
+                    value={studentData.tuitionType || 'individual'}
                     onChange={(e) =>
                       setStudentData({ ...studentData, tuitionType: e.target.value as TuitionType })
                     }
@@ -641,7 +641,7 @@ export const QuickActionModal: React.FC = () => {
                     <input
                       type="text"
                       placeholder="e.g. Morning Batch A (KMC)"
-                      value={studentData.groupName}
+                      value={studentData.groupName || ''}
                       onChange={(e) => setStudentData({ ...studentData, groupName: e.target.value })}
                       className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                     />
@@ -656,7 +656,7 @@ export const QuickActionModal: React.FC = () => {
                     type="number"
                     min="0"
                     placeholder="e.g. 5000"
-                    value={studentData.feeAmount}
+                    value={studentData.feeAmount ?? 0}
                     onChange={(e) =>
                       setStudentData({ ...studentData, feeAmount: Number(e.target.value) })
                     }
@@ -669,7 +669,7 @@ export const QuickActionModal: React.FC = () => {
                     Payment Structure
                   </label>
                   <select
-                    value={studentData.feeStructure}
+                    value={studentData.feeStructure || 'monthly'}
                     onChange={(e) =>
                       setStudentData({ ...studentData, feeStructure: e.target.value as FeeStructureType })
                     }
@@ -689,7 +689,7 @@ export const QuickActionModal: React.FC = () => {
                   <input
                     type="tel"
                     placeholder="e.g. 9841234567"
-                    value={studentData.contactNumber}
+                    value={studentData.contactNumber || ''}
                     onChange={(e) => setStudentData({ ...studentData, contactNumber: e.target.value })}
                     className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                   />
@@ -710,7 +710,7 @@ export const QuickActionModal: React.FC = () => {
                   <input
                     type="date"
                     required
-                    value={studentData.startDate}
+                    value={studentData.startDate || ''}
                     onChange={(e) => setStudentData({ ...studentData, startDate: e.target.value })}
                     className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                   />
@@ -723,7 +723,7 @@ export const QuickActionModal: React.FC = () => {
                   <input
                     type="text"
                     placeholder="e.g. St. Xavier's / Budhanilkantha"
-                    value={studentData.schoolOrCollege}
+                    value={studentData.schoolOrCollege || ''}
                     onChange={(e) =>
                       setStudentData({ ...studentData, schoolOrCollege: e.target.value })
                     }
@@ -738,7 +738,7 @@ export const QuickActionModal: React.FC = () => {
                   <input
                     type="text"
                     placeholder="e.g. Baneshwor, Kathmandu"
-                    value={studentData.address}
+                    value={studentData.address || ''}
                     onChange={(e) => setStudentData({ ...studentData, address: e.target.value })}
                     className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                   />
@@ -773,7 +773,7 @@ export const QuickActionModal: React.FC = () => {
                     Payment Category
                   </label>
                   <select
-                    value={paymentData.type}
+                    value={paymentData.type || 'tuition'}
                     onChange={(e) =>
                       setPaymentData({
                         ...paymentData,
@@ -795,7 +795,7 @@ export const QuickActionModal: React.FC = () => {
                   {paymentData.type === 'tuition' ? (
                     <select
                       required
-                      value={paymentData.targetId}
+                      value={paymentData.targetId || ''}
                       onChange={(e) => {
                         const st = students.find((s) => s.id === e.target.value);
                         const fee = st
@@ -831,7 +831,7 @@ export const QuickActionModal: React.FC = () => {
                   ) : (
                     <select
                       required
-                      value={paymentData.targetId}
+                      value={paymentData.targetId || ''}
                       onChange={(e) => {
                         const inst = institutions.find((i) => i.id === e.target.value);
                         const fee = inst
@@ -870,7 +870,7 @@ export const QuickActionModal: React.FC = () => {
                     min="1"
                     required
                     placeholder="e.g. 5000"
-                    value={paymentData.amountPaid}
+                    value={paymentData.amountPaid ?? 0}
                     onChange={(e) =>
                       setPaymentData({ ...paymentData, amountPaid: Number(e.target.value) })
                     }
@@ -886,7 +886,7 @@ export const QuickActionModal: React.FC = () => {
                     type="number"
                     min="0"
                     placeholder="e.g. 5000"
-                    value={paymentData.amountDue}
+                    value={paymentData.amountDue ?? 0}
                     onChange={(e) =>
                       setPaymentData({ ...paymentData, amountDue: Number(e.target.value) })
                     }
@@ -899,7 +899,7 @@ export const QuickActionModal: React.FC = () => {
                     Payment Method
                   </label>
                   <select
-                    value={paymentData.paymentMethod}
+                    value={paymentData.paymentMethod || 'eSewa'}
                     onChange={(e) =>
                       setPaymentData({ ...paymentData, paymentMethod: e.target.value as PaymentMethod })
                     }
@@ -922,7 +922,7 @@ export const QuickActionModal: React.FC = () => {
                   <input
                     type="date"
                     required
-                    value={paymentData.paymentDate}
+                    value={paymentData.paymentDate || ''}
                     onChange={(e) => setPaymentData({ ...paymentData, paymentDate: e.target.value })}
                     className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                   />
@@ -935,7 +935,7 @@ export const QuickActionModal: React.FC = () => {
                   <input
                     type="text"
                     placeholder="e.g. Bhadra 2083 or Aug 2026"
-                    value={paymentData.periodMonthYear}
+                    value={paymentData.periodMonthYear || ''}
                     onChange={(e) =>
                       setPaymentData({ ...paymentData, periodMonthYear: e.target.value })
                     }
@@ -950,7 +950,7 @@ export const QuickActionModal: React.FC = () => {
                   <input
                     type="text"
                     placeholder="e.g. TXN-94821 or Cash receipt"
-                    value={paymentData.referenceNote}
+                    value={paymentData.referenceNote || ''}
                     onChange={(e) =>
                       setPaymentData({ ...paymentData, referenceNote: e.target.value })
                     }
@@ -990,7 +990,7 @@ export const QuickActionModal: React.FC = () => {
                     type="text"
                     required
                     placeholder="e.g. Grade 10 Opt Math or KMC Physics"
-                    value={classData.title}
+                    value={classData.title || ''}
                     onChange={(e) => setClassData({ ...classData, title: e.target.value })}
                     className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                   />
@@ -1001,7 +1001,7 @@ export const QuickActionModal: React.FC = () => {
                     Class Type
                   </label>
                   <select
-                    value={classData.type}
+                    value={classData.type || 'home_tuition'}
                     onChange={(e) =>
                       setClassData({
                         ...classData,
@@ -1023,7 +1023,7 @@ export const QuickActionModal: React.FC = () => {
                   </label>
                   {classData.type === 'home_tuition' ? (
                     <select
-                      value={classData.studentId}
+                      value={classData.studentId || ''}
                       onChange={(e) => {
                         const st = students.find((s) => s.id === e.target.value);
                         setClassData({
@@ -1044,7 +1044,7 @@ export const QuickActionModal: React.FC = () => {
                     </select>
                   ) : (
                     <select
-                      value={classData.institutionId}
+                      value={classData.institutionId || ''}
                       onChange={(e) => {
                         const inst = institutions.find((i) => i.id === e.target.value);
                         setClassData({
@@ -1073,7 +1073,7 @@ export const QuickActionModal: React.FC = () => {
                   <input
                     type="text"
                     placeholder="e.g. Mathematics"
-                    value={classData.subject}
+                    value={classData.subject || ''}
                     onChange={(e) => setClassData({ ...classData, subject: e.target.value })}
                     className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                   />
@@ -1085,7 +1085,7 @@ export const QuickActionModal: React.FC = () => {
                   </label>
                   <input
                     type="date"
-                    value={classData.startDate}
+                    value={classData.startDate || ''}
                     onChange={(e) => setClassData({ ...classData, startDate: e.target.value })}
                     className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                   />
@@ -1185,7 +1185,7 @@ export const QuickActionModal: React.FC = () => {
                           <input
                             type="time"
                             required
-                            value={classData.startTime}
+                            value={classData.startTime || '06:30'}
                             onChange={(e) => {
                               const newStart = e.target.value;
                               const newEnd = calculateEndTime(newStart, classData.durationMinutes);
@@ -1224,7 +1224,7 @@ export const QuickActionModal: React.FC = () => {
                             type="number"
                             min="5"
                             step="1"
-                            value={classData.durationMinutes}
+                            value={classData.durationMinutes ?? 60}
                             onChange={(e) => {
                               const dur = Number(e.target.value) || 60;
                               const newEnd = calculateEndTime(classData.startTime, dur);
@@ -1241,7 +1241,7 @@ export const QuickActionModal: React.FC = () => {
                           <input
                             type="time"
                             required
-                            value={classData.endTime}
+                            value={classData.endTime || '07:30'}
                             onChange={(e) => {
                               const newEnd = e.target.value;
                               const dur = calculateDurationMinutes(classData.startTime, newEnd);
@@ -1300,7 +1300,7 @@ export const QuickActionModal: React.FC = () => {
                                 <div className="flex items-center gap-2 flex-1">
                                   <input
                                     type="time"
-                                    value={sched.startTime}
+                                    value={sched.startTime || '06:30'}
                                     onChange={(e) => {
                                       const st = e.target.value;
                                       const et = calculateEndTime(st, sched.durationMinutes);
@@ -1315,7 +1315,7 @@ export const QuickActionModal: React.FC = () => {
                                   <span className="text-slate-400">to</span>
                                   <input
                                     type="time"
-                                    value={sched.endTime}
+                                    value={sched.endTime || '07:30'}
                                     onChange={(e) => {
                                       const et = e.target.value;
                                       const dur = calculateDurationMinutes(sched.startTime, et);
@@ -1367,7 +1367,7 @@ export const QuickActionModal: React.FC = () => {
                             </label>
                             <input
                               type="date"
-                              value={newOverrideDate}
+                              value={newOverrideDate || ''}
                               onChange={(e) => setNewOverrideDate(e.target.value)}
                               className="w-full px-2 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200"
                             />
@@ -1378,7 +1378,7 @@ export const QuickActionModal: React.FC = () => {
                             </label>
                             <input
                               type="time"
-                              value={newOverrideStartTime}
+                              value={newOverrideStartTime || ''}
                               onChange={(e) => setNewOverrideStartTime(e.target.value)}
                               className="w-full px-2 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200"
                             />
@@ -1389,7 +1389,7 @@ export const QuickActionModal: React.FC = () => {
                             </label>
                             <input
                               type="time"
-                              value={newOverrideEndTime}
+                              value={newOverrideEndTime || ''}
                               onChange={(e) => setNewOverrideEndTime(e.target.value)}
                               className="w-full px-2 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200"
                             />
@@ -1401,7 +1401,7 @@ export const QuickActionModal: React.FC = () => {
                             <input
                               type="text"
                               placeholder="e.g. Pre-Board Exam"
-                              value={newOverrideNote}
+                              value={newOverrideNote || ''}
                               onChange={(e) => setNewOverrideNote(e.target.value)}
                               className="w-full px-2 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200"
                             />
@@ -1508,7 +1508,7 @@ export const QuickActionModal: React.FC = () => {
                     type="text"
                     required
                     placeholder="e.g. Apex College / KMC"
-                    value={institutionData.name}
+                    value={institutionData.name || ''}
                     onChange={(e) =>
                       setInstitutionData({ ...institutionData, name: e.target.value })
                     }
@@ -1523,7 +1523,7 @@ export const QuickActionModal: React.FC = () => {
                   <input
                     type="text"
                     placeholder="e.g. +2 Science, BIM, BCA"
-                    value={institutionData.facultyOrGrade}
+                    value={institutionData.facultyOrGrade || ''}
                     onChange={(e) =>
                       setInstitutionData({ ...institutionData, facultyOrGrade: e.target.value })
                     }
@@ -1538,7 +1538,7 @@ export const QuickActionModal: React.FC = () => {
                   <input
                     type="text"
                     placeholder="e.g. Physics, Numerical Methods"
-                    value={institutionData.subjects}
+                    value={institutionData.subjects || ''}
                     onChange={(e) =>
                       setInstitutionData({ ...institutionData, subjects: e.target.value })
                     }
@@ -1551,7 +1551,7 @@ export const QuickActionModal: React.FC = () => {
                     Pay Structure
                   </label>
                   <select
-                    value={institutionData.paymentStructure}
+                    value={institutionData.paymentStructure || 'per_period'}
                     onChange={(e) =>
                       setInstitutionData({
                         ...institutionData,
@@ -1574,7 +1574,7 @@ export const QuickActionModal: React.FC = () => {
                     type="number"
                     min="0"
                     placeholder="e.g. 850 or 35000"
-                    value={institutionData.rateAmount}
+                    value={institutionData.rateAmount ?? 0}
                     onChange={(e) =>
                       setInstitutionData({ ...institutionData, rateAmount: Number(e.target.value) })
                     }
@@ -1588,7 +1588,7 @@ export const QuickActionModal: React.FC = () => {
                   </label>
                   <input
                     type="date"
-                    value={institutionData.startDate}
+                    value={institutionData.startDate || ''}
                     onChange={(e) =>
                       setInstitutionData({ ...institutionData, startDate: e.target.value })
                     }
@@ -1603,7 +1603,7 @@ export const QuickActionModal: React.FC = () => {
                   <input
                     type="text"
                     placeholder="e.g. Dr. K. Sharma (Coordinator)"
-                    value={institutionData.contactPerson}
+                    value={institutionData.contactPerson || ''}
                     onChange={(e) =>
                       setInstitutionData({ ...institutionData, contactPerson: e.target.value })
                     }
@@ -1618,7 +1618,7 @@ export const QuickActionModal: React.FC = () => {
                   <input
                     type="tel"
                     placeholder="e.g. 01-4478123"
-                    value={institutionData.contactNumber}
+                    value={institutionData.contactNumber || ''}
                     onChange={(e) =>
                       setInstitutionData({ ...institutionData, contactNumber: e.target.value })
                     }
@@ -1732,7 +1732,7 @@ export const QuickActionModal: React.FC = () => {
                             type="number"
                             min="1"
                             max="10"
-                            value={institutionData.numberOfPeriods}
+                            value={institutionData.numberOfPeriods ?? 1}
                             onChange={(e) => {
                               const val = Math.max(1, Number(e.target.value));
                               const synced: Record<DayOfWeek, number> = {
@@ -1762,7 +1762,7 @@ export const QuickActionModal: React.FC = () => {
                             type="number"
                             min="5"
                             step="1"
-                            value={institutionData.periodDurationMinutes}
+                            value={institutionData.periodDurationMinutes ?? 45}
                             onChange={(e) =>
                               setInstitutionData({
                                 ...institutionData,
@@ -1784,7 +1784,7 @@ export const QuickActionModal: React.FC = () => {
                             type="number"
                             min="5"
                             step="1"
-                            value={institutionData.periodDurationMinutes}
+                            value={institutionData.periodDurationMinutes ?? 45}
                             onChange={(e) =>
                               setInstitutionData({
                                 ...institutionData,
@@ -1817,7 +1817,7 @@ export const QuickActionModal: React.FC = () => {
                                   type="number"
                                   min="0"
                                   max="10"
-                                  value={count}
+                                  value={count ?? 0}
                                   onChange={(e) => {
                                     const val = Math.max(0, Number(e.target.value) || 0);
                                     setInstitutionData({
@@ -1885,7 +1885,7 @@ export const QuickActionModal: React.FC = () => {
                   </label>
                   <select
                     required
-                    value={attendanceData.classId}
+                    value={attendanceData.classId || ''}
                     onChange={(e) =>
                       setAttendanceData({ ...attendanceData, classId: e.target.value })
                     }
@@ -1905,7 +1905,7 @@ export const QuickActionModal: React.FC = () => {
                     Attendance Status
                   </label>
                   <select
-                    value={attendanceData.status}
+                    value={attendanceData.status || 'present'}
                     onChange={(e) =>
                       setAttendanceData({
                         ...attendanceData,
@@ -1928,7 +1928,7 @@ export const QuickActionModal: React.FC = () => {
                   <input
                     type="date"
                     required
-                    value={attendanceData.date}
+                    value={attendanceData.date || ''}
                     onChange={(e) =>
                       setAttendanceData({ ...attendanceData, date: e.target.value })
                     }
@@ -1943,7 +1943,7 @@ export const QuickActionModal: React.FC = () => {
                   <input
                     type="text"
                     placeholder="e.g. Quadratic Equations Ex 4.2"
-                    value={attendanceData.topicsCovered}
+                    value={attendanceData.topicsCovered || ''}
                     onChange={(e) =>
                       setAttendanceData({ ...attendanceData, topicsCovered: e.target.value })
                     }
@@ -1982,7 +1982,7 @@ export const QuickActionModal: React.FC = () => {
                   </label>
                   <select
                     required
-                    value={performanceData.studentId}
+                    value={performanceData.studentId || ''}
                     onChange={(e) => {
                       const st = students.find((s) => s.id === e.target.value);
                       setPerformanceData({
@@ -2010,7 +2010,7 @@ export const QuickActionModal: React.FC = () => {
                     type="text"
                     required
                     placeholder="e.g. Mathematics"
-                    value={performanceData.subject}
+                    value={performanceData.subject || ''}
                     onChange={(e) =>
                       setPerformanceData({ ...performanceData, subject: e.target.value })
                     }
@@ -2026,7 +2026,7 @@ export const QuickActionModal: React.FC = () => {
                     type="text"
                     required
                     placeholder="e.g. Unit Test 1 or First Terminal"
-                    value={performanceData.testName}
+                    value={performanceData.testName || ''}
                     onChange={(e) =>
                       setPerformanceData({ ...performanceData, testName: e.target.value })
                     }
@@ -2039,7 +2039,7 @@ export const QuickActionModal: React.FC = () => {
                     Test Category
                   </label>
                   <select
-                    value={performanceData.testType}
+                    value={performanceData.testType || 'unit_test'}
                     onChange={(e) =>
                       setPerformanceData({ ...performanceData, testType: e.target.value as TestType })
                     }
@@ -2062,7 +2062,7 @@ export const QuickActionModal: React.FC = () => {
                     min="0"
                     required
                     placeholder="e.g. 42"
-                    value={performanceData.obtainedMarks}
+                    value={performanceData.obtainedMarks ?? 0}
                     onChange={(e) =>
                       setPerformanceData({
                         ...performanceData,
@@ -2082,7 +2082,7 @@ export const QuickActionModal: React.FC = () => {
                     min="1"
                     required
                     placeholder="e.g. 50 or 100"
-                    value={performanceData.fullMarks}
+                    value={performanceData.fullMarks ?? 100}
                     onChange={(e) =>
                       setPerformanceData({
                         ...performanceData,
@@ -2100,7 +2100,7 @@ export const QuickActionModal: React.FC = () => {
                   <input
                     type="date"
                     required
-                    value={performanceData.date}
+                    value={performanceData.date || ''}
                     onChange={(e) =>
                       setPerformanceData({ ...performanceData, date: e.target.value })
                     }
@@ -2113,7 +2113,7 @@ export const QuickActionModal: React.FC = () => {
                     Homework / Assignment Status
                   </label>
                   <select
-                    value={performanceData.assignmentStatus}
+                    value={performanceData.assignmentStatus || 'completed'}
                     onChange={(e) =>
                       setPerformanceData({
                         ...performanceData,

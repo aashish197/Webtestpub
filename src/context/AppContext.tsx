@@ -31,7 +31,7 @@ import {
 } from '../utils/sampleData';
 import { getTodayIso, adToBs, formatDualDate, calculatePaymentSchedule } from '../utils/nepaliCalendar';
 import { calculateGrade } from '../utils/formatters';
-import { resolveClassSchedule } from '../utils/scheduleHelpers';
+import { resolveClassSchedule, DAYS_OF_WEEK } from '../utils/scheduleHelpers';
 import {
   auth,
   db,
@@ -226,6 +226,32 @@ export const sanitizeInstitution = (inst: Institution): Institution => {
   return inst;
 };
 
+export const sanitizeTeachingClass = (cls: TeachingClass): TeachingClass => {
+  if (cls.scheduleType === 'day_wise' && cls.dayWiseSchedules) {
+    const activeFromSchedules = DAYS_OF_WEEK.filter(
+      (d) => cls.dayWiseSchedules?.[d]?.isActive === true
+    );
+    if (activeFromSchedules.length > 0) {
+      const hasDesync =
+        activeFromSchedules.some((d) => !cls.scheduleDays?.includes(d)) ||
+        cls.scheduleDays?.some((d) => cls.dayWiseSchedules?.[d]?.isActive === false);
+
+      if (hasDesync) {
+        const firstDay = activeFromSchedules[0];
+        const firstCfg = cls.dayWiseSchedules[firstDay];
+        return {
+          ...cls,
+          scheduleDays: activeFromSchedules,
+          startTime: firstCfg?.startTime || cls.startTime,
+          endTime: firstCfg?.endTime || cls.endTime,
+          durationMinutes: firstCfg?.durationMinutes || cls.durationMinutes,
+        };
+      }
+    }
+  }
+  return cls;
+};
+
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -313,7 +339,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [classes, setClasses] = useState<TeachingClass[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.CLASSES);
-      return saved ? JSON.parse(saved) : INITIAL_CLASSES;
+      const raw = saved ? JSON.parse(saved) : INITIAL_CLASSES;
+      return Array.isArray(raw) ? raw.map(sanitizeTeachingClass) : INITIAL_CLASSES;
     } catch {
       return INITIAL_CLASSES;
     }
@@ -482,7 +509,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             if (data.settings) setSettings(prev => ({ ...prev, ...data.settings }));
             if (Array.isArray(data.students)) setStudents(data.students);
             if (Array.isArray(data.institutions)) setInstitutions(data.institutions.map(sanitizeInstitution));
-            if (Array.isArray(data.classes)) setClasses(data.classes);
+            if (Array.isArray(data.classes)) setClasses(data.classes.map(sanitizeTeachingClass));
             if (Array.isArray(data.attendance)) setAttendance(data.attendance);
             if (Array.isArray(data.payments)) setPayments(data.payments);
             if (Array.isArray(data.performance)) setPerformance(data.performance);
@@ -736,16 +763,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Class Actions
   const addClass = (clsData: Omit<TeachingClass, 'id'>): TeachingClass => {
-    const newCls: TeachingClass = {
+    const newCls: TeachingClass = sanitizeTeachingClass({
       ...clsData,
       id: `cls-${Date.now()}`,
-    };
+    });
     setClasses(prev => [newCls, ...prev]);
     return newCls;
   };
 
   const updateClass = (id: string, data: Partial<TeachingClass>) => {
-    setClasses(prev => prev.map(c => (c.id === id ? { ...c, ...data } : c)));
+    setClasses(prev => prev.map(c => (c.id === id ? sanitizeTeachingClass({ ...c, ...data }) : c)));
   };
 
   const deleteClass = (id: string) => {
@@ -1355,8 +1382,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const parsed = JSON.parse(jsonData);
       if (parsed.settings) setSettings(parsed.settings);
       if (Array.isArray(parsed.students)) setStudents(parsed.students);
-      if (Array.isArray(parsed.institutions)) setInstitutions(parsed.institutions);
-      if (Array.isArray(parsed.classes)) setClasses(parsed.classes);
+      if (Array.isArray(parsed.institutions)) setInstitutions(parsed.institutions.map(sanitizeInstitution));
+      if (Array.isArray(parsed.classes)) setClasses(parsed.classes.map(sanitizeTeachingClass));
       if (Array.isArray(parsed.attendance)) setAttendance(parsed.attendance);
       if (Array.isArray(parsed.payments)) setPayments(parsed.payments);
       if (Array.isArray(parsed.performance)) setPerformance(parsed.performance);
