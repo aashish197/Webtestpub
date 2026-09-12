@@ -100,13 +100,14 @@ export const Dashboard: React.FC = () => {
     status: 'present' | 'absent' | 'cancelled'
   ) => {
     let targetName = cls.title;
+    const sec = (cls as any).sectionName || cls.section;
     if (cls.type === 'home_tuition') {
       const student = students.find((s) => s.id === cls.studentId);
       if (student) targetName = student.name;
       if (cls.groupName) targetName = cls.groupName;
     } else if (cls.type === 'college') {
       const inst = institutions.find((i) => i.id === cls.institutionId);
-      if (inst) targetName = inst.name;
+      if (inst) targetName = sec ? `${inst.name} (${sec})` : inst.name;
     }
 
     markAttendance({
@@ -121,8 +122,10 @@ export const Dashboard: React.FC = () => {
       endTime: cls.endTime,
       durationMinutes: cls.durationMinutes,
       periodsCount: cls.type === 'college' ? 1 : undefined,
+      section: sec,
+      sectionSlotId: (cls as any).sectionSlotId,
       status,
-      notes: `Quick marked from dashboard as ${status}`,
+      notes: `Quick marked from dashboard as ${status}${sec ? ` for ${sec}` : ''}`,
     });
 
     if (status === 'present') {
@@ -142,13 +145,14 @@ export const Dashboard: React.FC = () => {
   const handleMarkAllPresent = () => {
     unmarkedTodayClasses.forEach((cls) => {
       let targetName = cls.title;
+      const sec = (cls as any).sectionName || cls.section;
       if (cls.type === 'home_tuition') {
         const student = students.find((s) => s.id === cls.studentId);
         if (student) targetName = student.name;
         if (cls.groupName) targetName = cls.groupName;
       } else if (cls.type === 'college') {
         const inst = institutions.find((i) => i.id === cls.institutionId);
-        if (inst) targetName = inst.name;
+        if (inst) targetName = sec ? `${inst.name} (${sec})` : inst.name;
       }
 
       markAttendance({
@@ -163,8 +167,10 @@ export const Dashboard: React.FC = () => {
         endTime: cls.endTime,
         durationMinutes: cls.durationMinutes,
         periodsCount: cls.type === 'college' ? 1 : undefined,
+        section: sec,
+        sectionSlotId: (cls as any).sectionSlotId,
         status: 'present',
-        notes: `Batch marked as present from dashboard`,
+        notes: `Batch marked as present from dashboard${sec ? ` for ${sec}` : ''}`,
       });
     });
 
@@ -576,6 +582,11 @@ export const Dashboard: React.FC = () => {
                               >
                                 {isCollege ? 'College' : 'Home Tuition'}
                               </span>
+                              {((cls as any).sectionName || cls.section) && (
+                                <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300">
+                                  {(cls as any).sectionName || cls.section}
+                                </span>
+                              )}
                               {liveStatus && (
                                 <span className={`px-2 py-0.5 text-[10px] rounded-md ${liveStatus.badgeClass}`}>
                                   {liveStatus.label}

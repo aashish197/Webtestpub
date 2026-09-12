@@ -7,6 +7,7 @@ import {
   ClassScheduleType,
   DayWiseClassSchedule,
   DateSpecificClassSchedule,
+  ClassSectionSlot,
 } from '../types';
 import {
   CalendarDays,
@@ -28,10 +29,18 @@ import {
   Sparkles,
   AlertCircle,
   Sliders,
+  Copy,
+  BookOpen,
 } from 'lucide-react';
 import { formatCurrency, formatTime } from '../utils/formatters';
 import { formatDisplayDate, getTodayIso, NEPALI_MONTHS_EN, adToBs } from '../utils/nepaliCalendar';
-import { resolveClassSchedule, calculateEndTime, calculateDurationMinutes, DAYS_OF_WEEK } from '../utils/scheduleHelpers';
+import {
+  resolveClassSchedule,
+  resolveClassDaySlots,
+  calculateEndTime,
+  calculateDurationMinutes,
+  DAYS_OF_WEEK,
+} from '../utils/scheduleHelpers';
 
 const PRESET_COLORS = [
   '#3b82f6', // blue
@@ -152,6 +161,8 @@ export const ClassesRoutineView: React.FC = () => {
         startTime: existing?.startTime || cls.startTime || DEFAULT_DAY_WISE_TIMES[d].startTime,
         endTime: existing?.endTime || cls.endTime || DEFAULT_DAY_WISE_TIMES[d].endTime,
         durationMinutes: existing?.durationMinutes || cls.durationMinutes || DEFAULT_DAY_WISE_TIMES[d].durationMinutes,
+        section: existing?.section || cls.section,
+        slots: existing?.slots ? existing.slots.map((s) => ({ ...s })) : undefined,
         location: existing?.location || cls.location,
         note: existing?.note || '',
       };
@@ -169,6 +180,7 @@ export const ClassesRoutineView: React.FC = () => {
       groupName: cls.groupName,
       institutionId: cls.institutionId || '',
       subject: cls.subject,
+      section: cls.section,
       location: cls.location,
       feeStructure: cls.feeStructure,
       feeAmount: cls.feeAmount,
@@ -267,6 +279,163 @@ export const ClassesRoutineView: React.FC = () => {
     handleUpdateDaySchedule(day, updates);
   };
 
+  // Multiple Sections / Periods Handlers for a Day
+  const handleAddDaySlot = (day: DayOfWeek) => {
+    const currentSched = formData.dayWiseSchedules?.[day] || {
+      day,
+      isActive: true,
+      startTime: '07:00',
+      endTime: '08:00',
+      durationMinutes: 60,
+    };
+
+    const existingSlots: ClassSectionSlot[] =
+      currentSched.slots && currentSched.slots.length > 0
+        ? [...currentSched.slots]
+        : [
+            {
+              slotId: `slot-${day.toLowerCase()}-1`,
+              section: currentSched.section || (formData.type === 'college' ? 'Section A' : 'Batch 1'),
+              startTime: currentSched.startTime || '07:00',
+              endTime: currentSched.endTime || '07:45',
+              durationMinutes: currentSched.durationMinutes || 45,
+              subject: formData.subject,
+            },
+          ];
+
+    const lastSlot = existingSlots[existingSlots.length - 1];
+    let nextStart = lastSlot ? lastSlot.endTime : '08:00';
+    let nextEnd = calculateEndTime(nextStart, lastSlot?.durationMinutes || 45);
+
+    if (nextEnd <= nextStart) {
+      nextEnd = calculateEndTime(nextStart, 45);
+    }
+
+    const nextChar = String.fromCharCode(65 + existingSlots.length);
+    let nextSection = formData.type === 'college' ? `Section ${nextChar}` : `Batch ${existingSlots.length + 1}`;
+    if (existingSlots.some((s) => s.section === nextSection)) {
+      nextSection = `${nextSection} (2)`;
+    }
+
+    const slotUniqueId = `slot-${day.toLowerCase()}-${Date.now()}-${existingSlots.length + 1}`;
+    const newSlot: ClassSectionSlot = {
+      id: slotUniqueId,
+      slotId: slotUniqueId,
+      section: nextSection,
+      startTime: nextStart,
+      endTime: nextEnd,
+      durationMinutes: calculateDurationMinutes(nextStart, nextEnd) || 45,
+      subject: formData.subject,
+    };
+
+    const newSlots = [...existingSlots, newSlot];
+
+    handleDayWiseScheduleChange(day, {
+      isActive: true,
+      slots: newSlots,
+      startTime: newSlots[0].startTime,
+      endTime: newSlots[newSlots.length - 1].endTime,
+      durationMinutes: newSlots.reduce((acc, s) => acc + (s.durationMinutes || 0), 0),
+    });
+  };
+
+  const handleUpdateDaySlot = (
+    day: DayOfWeek,
+    slotIndex: number,
+    updates: Partial<ClassSectionSlot>
+  ) => {
+    const currentSched = formData.dayWiseSchedules?.[day];
+    if (!currentSched) return;
+
+    const slots: ClassSectionSlot[] =
+      currentSched.slots && currentSched.slots.length > 0
+        ? [...currentSched.slots]
+        : [
+            {
+              slotId: `slot-${day.toLowerCase()}-1`,
+              section: currentSched.section || (formData.type === 'college' ? 'Section A' : 'Batch 1'),
+              startTime: currentSched.startTime || '07:00',
+              endTime: currentSched.endTime || '07:45',
+              durationMinutes: currentSched.durationMinutes || 45,
+            },
+          ];
+
+    if (!slots[slotIndex]) return;
+
+    const updatedSlot = { ...slots[slotIndex], ...updates };
+    if (updates.startTime || updates.endTime) {
+      const s = updates.startTime || updatedSlot.startTime;
+      const e = updates.endTime || updatedSlot.endTime;
+      const diff = calculateDurationMinutes(s, e);
+      if (diff > 0) {
+        updatedSlot.durationMinutes = diff;
+      }
+    }
+
+    slots[slotIndex] = updatedSlot;
+
+    handleDayWiseScheduleChange(day, {
+      slots,
+      startTime: slots[0].startTime,
+      endTime: slots[slots.length - 1].endTime,
+      durationMinutes: slots.reduce((acc, s) => acc + (s.durationMinutes || 0), 0),
+    });
+  };
+
+  const handleRemoveDaySlot = (day: DayOfWeek, slotIndex: number) => {
+    const currentSched = formData.dayWiseSchedules?.[day];
+    if (!currentSched || !currentSched.slots) return;
+
+    const newSlots = currentSched.slots.filter((_, idx) => idx !== slotIndex);
+    if (newSlots.length === 0) {
+      handleDayWiseScheduleChange(day, {
+        slots: undefined,
+        startTime: '07:00',
+        endTime: '08:00',
+        durationMinutes: 60,
+      });
+    } else {
+      handleDayWiseScheduleChange(day, {
+        slots: newSlots,
+        startTime: newSlots[0].startTime,
+        endTime: newSlots[newSlots.length - 1].endTime,
+        durationMinutes: newSlots.reduce((acc, s) => acc + (s.durationMinutes || 0), 0),
+      });
+    }
+  };
+
+  const handleCopyDayScheduleToActiveDays = (sourceDay: DayOfWeek) => {
+    const sourceSched = formData.dayWiseSchedules?.[sourceDay];
+    if (!sourceSched) return;
+
+    const updatedDayWise = { ...formData.dayWiseSchedules };
+    DAYS_OF_WEEK.forEach((targetDay) => {
+      if (targetDay !== sourceDay && updatedDayWise[targetDay]?.isActive) {
+        const clonedSlots = sourceSched.slots
+          ? sourceSched.slots.map((s, idx) => ({
+              ...s,
+              slotId: `slot-${targetDay.toLowerCase()}-${Date.now()}-${idx + 1}`,
+            }))
+          : undefined;
+
+        updatedDayWise[targetDay] = {
+          ...updatedDayWise[targetDay],
+          startTime: sourceSched.startTime,
+          endTime: sourceSched.endTime,
+          durationMinutes: sourceSched.durationMinutes,
+          section: sourceSched.section,
+          slots: clonedSlots,
+          location: sourceSched.location,
+        };
+      }
+    });
+
+    setFormData((prev) => ({
+      ...prev,
+      dayWiseSchedules: updatedDayWise,
+    }));
+  };
+
   const handleAddDateOverride = () => {
     if (!newOverrideDate) return;
     const dur = calculateDurationMinutes(newOverrideStartTime, newOverrideEndTime);
@@ -320,12 +489,29 @@ export const ClassesRoutineView: React.FC = () => {
       DAYS_OF_WEEK.forEach((d) => {
         const sched = formData.dayWiseSchedules?.[d];
         const isActive = finalScheduleDays.includes(d);
+        const slots = sched?.slots && sched.slots.length > 0 ? [...sched.slots] : undefined;
+        let dayStart = sched?.startTime || formData.startTime || '07:00';
+        let dayEnd = sched?.endTime || formData.endTime || '08:00';
+        let dayDur = sched?.durationMinutes || formData.durationMinutes || 60;
+        let daySec = sched?.section;
+
+        if (slots && slots.length > 0) {
+          dayStart = slots[0].startTime;
+          dayEnd = slots[slots.length - 1].endTime;
+          dayDur = slots.reduce((acc, s) => acc + (s.durationMinutes || 0), 0) || calculateDurationMinutes(dayStart, dayEnd);
+          daySec = slots[0].section;
+        }
+
         finalDayWiseSchedules![d] = {
           day: d,
           isActive,
-          startTime: sched?.startTime || formData.startTime || '07:00',
-          endTime: sched?.endTime || formData.endTime || '08:00',
-          durationMinutes: sched?.durationMinutes || formData.durationMinutes || 60,
+          startTime: dayStart,
+          endTime: dayEnd,
+          durationMinutes: dayDur,
+          section: daySec,
+          slots,
+          location: sched?.location,
+          note: sched?.note,
         };
       });
     }
@@ -353,6 +539,9 @@ export const ClassesRoutineView: React.FC = () => {
       startTime: fallbackStartTime,
       endTime: fallbackEndTime,
       durationMinutes: fallbackDuration,
+      section:
+        formData.section ||
+        (finalDayWiseSchedules && finalScheduleDays[0] && finalDayWiseSchedules[finalScheduleDays[0]]?.section),
     };
 
     if (editingClass) {
@@ -377,7 +566,7 @@ export const ClassesRoutineView: React.FC = () => {
     }
   };
 
-  // Group classes by day for weekly matrix with resolved day-wise timings
+  // Group classes by day for weekly matrix with resolved day-wise timings and multi-section slots
   const weeklyGridData = useMemo(() => {
     const map: Record<DayOfWeek, { cls: TeachingClass; resolved: ReturnType<typeof resolveClassSchedule> }[]> = {
       Sunday: [],
@@ -401,10 +590,22 @@ export const ClassesRoutineView: React.FC = () => {
 
         activeDays.forEach((day) => {
           if (map[day]) {
-            const resolved = resolveClassSchedule(cls, day);
-            if (resolved.isScheduled) {
-              map[day].push({ cls, resolved });
-            }
+            const slots = resolveClassDaySlots(cls, day);
+            slots.forEach((s) => {
+              map[day].push({
+                cls,
+                resolved: {
+                  isScheduled: true,
+                  startTime: s.startTime,
+                  endTime: s.endTime,
+                  durationMinutes: s.durationMinutes,
+                  section: s.section,
+                  sectionSlotId: s.slotId,
+                  subject: s.subject || cls.subject,
+                  room: s.room,
+                },
+              });
+            });
           }
         });
       });
@@ -569,11 +770,11 @@ export const ClassesRoutineView: React.FC = () => {
                         No class
                       </div>
                     ) : (
-                      dayClasses.map(({ cls, resolved }) => {
+                      dayClasses.map(({ cls, resolved }, slotIdx) => {
                         const isCollege = cls.type === 'college';
                         return (
                           <div
-                            key={cls.id}
+                            key={`${cls.id}_${resolved.sectionSlotId || slotIdx}`}
                             className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs hover:border-indigo-400 transition cursor-pointer group"
                             onClick={() => handleOpenEdit(cls)}
                           >
@@ -585,27 +786,34 @@ export const ClassesRoutineView: React.FC = () => {
                                 />
                                 {formatTime(resolved.startTime, settings.timeFormat)}
                               </span>
-                              <span
-                                className={`text-[9px] font-bold px-1 rounded ${
-                                  isCollege
-                                    ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300'
-                                    : 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300'
-                                }`}
-                              >
-                                {isCollege ? 'College' : 'Tuition'}
-                              </span>
+                              <div className="flex items-center gap-1 shrink-0">
+                                {resolved.section && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300">
+                                    {resolved.section}
+                                  </span>
+                                )}
+                                <span
+                                  className={`text-[9px] font-bold px-1 rounded ${
+                                    isCollege
+                                      ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300'
+                                      : 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300'
+                                  }`}
+                                >
+                                  {isCollege ? 'College' : 'Tuition'}
+                                </span>
+                              </div>
                             </div>
 
                             <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 mt-1 truncate">
                               {cls.title}
                             </p>
                             <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
-                              <span className="truncate">{cls.subject}</span>
+                              <span className="truncate">{resolved.subject || cls.subject}</span>
                               <span className="shrink-0">{resolved.durationMinutes}m</span>
                             </div>
-                            {cls.scheduleType === 'day_wise' && (
-                              <div className="mt-1 text-[9px] font-medium text-indigo-600 dark:text-indigo-400">
-                                Day-wise time
+                            {resolved.room && (
+                              <div className="text-[9px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                                📍 {resolved.room}
                               </div>
                             )}
                           </div>
@@ -657,7 +865,7 @@ export const ClassesRoutineView: React.FC = () => {
             ) : (
               weeklyGridData[selectedDay].map(({ cls, resolved }, idx) => (
                 <div
-                  key={cls.id}
+                  key={`${cls.id}_${resolved.sectionSlotId || idx}`}
                   className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                 >
                   <div className="flex items-start gap-3.5">
@@ -671,6 +879,11 @@ export const ClassesRoutineView: React.FC = () => {
                           {formatTime(resolved.startTime, settings.timeFormat)} -{' '}
                           {formatTime(resolved.endTime, settings.timeFormat)} ({resolved.durationMinutes} mins)
                         </span>
+                        {resolved.section && (
+                          <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                            {resolved.section}
+                          </span>
+                        )}
                         <span
                           className={`px-2 py-0.5 text-[10px] font-bold rounded-md ${
                             cls.type === 'college'
@@ -681,8 +894,8 @@ export const ClassesRoutineView: React.FC = () => {
                           {cls.type === 'college' ? 'College' : 'Home Tuition'}
                         </span>
                         {cls.scheduleType === 'day_wise' && (
-                          <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
-                            Day-Wise Time
+                          <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                            Day-Wise
                           </span>
                         )}
                         {cls.dateSpecificSchedules && cls.dateSpecificSchedules.length > 0 && (
@@ -696,8 +909,14 @@ export const ClassesRoutineView: React.FC = () => {
                       </h4>
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                         <span>
-                          Subject: <strong className="text-slate-700 dark:text-slate-300">{cls.subject}</strong>
+                          Subject: <strong className="text-slate-700 dark:text-slate-300">{resolved.subject || cls.subject}</strong>
                         </span>
+                        {resolved.room && (
+                          <>
+                            <span>•</span>
+                            <span>Room: <strong className="text-slate-700 dark:text-slate-300">{resolved.room}</strong></span>
+                          </>
+                        )}
                         <span>•</span>
                         <span>Location: {cls.location}</span>
                         {cls.startDate && (
@@ -1307,16 +1526,38 @@ export const ClassesRoutineView: React.FC = () => {
                         />
                       </div>
                     </div>
+
+                    {formData.type === 'college' && (
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                          Section / Batch (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Section A, Sec B, BIM 1st"
+                          value={formData.section || ''}
+                          onChange={(e) => setFormData({ ...formData, section: e.target.value })}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none text-xs"
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {/* DAY-WISE VARIABLE SCHEDULE CONTROLS */}
+                {/* DAY-WISE VARIABLE SCHEDULE & MULTI-SECTION CONTROLS */}
                 {formData.scheduleType === 'day_wise' && (
-                  <div className="space-y-2 pt-2">
-                    <p className="text-xs text-slate-500">
-                      Enable or disable class on each day, and set custom times for each day:
-                    </p>
-                    <div className="space-y-2">
+                  <div className="space-y-3 pt-2">
+                    <div className="bg-indigo-50/60 dark:bg-indigo-950/40 p-3 rounded-xl border border-indigo-100 dark:border-indigo-800/60">
+                      <p className="text-xs font-bold text-indigo-900 dark:text-indigo-200 flex items-center gap-1.5">
+                        <Building2 className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                        Multi-Period & Section Day-Wise Routine
+                      </p>
+                      <p className="text-[11px] text-indigo-700/80 dark:text-indigo-300/80 mt-0.5">
+                        Specify multiple periods or sections (e.g., Section A, Section B) at different times for each day. Attendance will be recorded individually for every section.
+                      </p>
+                    </div>
+
+                    <div className="space-y-3">
                       {DAYS_OF_WEEK.map((day) => {
                         const sched = formData.dayWiseSchedules[day] || {
                           day,
@@ -1326,76 +1567,277 @@ export const ClassesRoutineView: React.FC = () => {
                           durationMinutes: 60,
                         };
 
+                        const daySlots: ClassSectionSlot[] =
+                          sched.slots && sched.slots.length > 0
+                            ? sched.slots
+                            : [
+                                {
+                                  id: `slot-${day.toLowerCase()}-1`,
+                                  slotId: `slot-${day.toLowerCase()}-1`,
+                                  section: sched.section || (formData.type === 'college' ? 'Section A' : 'Batch 1'),
+                                  startTime: sched.startTime || '07:00',
+                                  endTime: sched.endTime || '07:45',
+                                  durationMinutes: sched.durationMinutes || 45,
+                                  subject: formData.subject,
+                                },
+                              ];
+
+                        const totalDayMins = daySlots.reduce((acc, s) => acc + (s.durationMinutes || 0), 0);
+
+                        if (!sched.isActive) {
+                          return (
+                            <div
+                              key={day}
+                              className="p-2.5 sm:p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100/50 dark:bg-slate-900/30 flex items-center justify-between transition"
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <input
+                                  type="checkbox"
+                                  id={`day-active-${day}`}
+                                  checked={false}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      handleDayWiseScheduleChange(day, {
+                                        isActive: true,
+                                        slots: daySlots,
+                                        startTime: daySlots[0].startTime,
+                                        endTime: daySlots[daySlots.length - 1].endTime,
+                                        durationMinutes: totalDayMins,
+                                        section: daySlots[0].section,
+                                      });
+                                    }
+                                  }}
+                                  className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
+                                />
+                                <label
+                                  htmlFor={`day-active-${day}`}
+                                  className="text-xs font-bold text-slate-500 dark:text-slate-400 cursor-pointer"
+                                >
+                                  {day}
+                                </label>
+                              </div>
+                              <span className="text-xs text-slate-400 italic">No class scheduled</span>
+                            </div>
+                          );
+                        }
+
                         return (
                           <div
                             key={day}
-                            className={`p-2.5 rounded-xl border transition flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 ${
-                              sched.isActive
-                                ? 'bg-white dark:bg-slate-800 border-indigo-200 dark:border-indigo-800/60 shadow-xs'
-                                : 'bg-slate-100/60 dark:bg-slate-900/30 border-slate-200 dark:border-slate-800 opacity-70'
-                            }`}
+                            className="p-3.5 rounded-xl border border-indigo-200 dark:border-indigo-800/60 bg-white dark:bg-slate-800 shadow-xs space-y-3"
                           >
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                id={`day-active-${day}`}
-                                checked={sched.isActive}
-                                onChange={(e) =>
-                                  handleDayWiseScheduleChange(day, { isActive: e.target.checked })
-                                }
-                                className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
-                              />
-                              <label
-                                htmlFor={`day-active-${day}`}
-                                className="text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer min-w-[70px]"
-                              >
-                                {day}
-                              </label>
-                            </div>
+                            {/* Day Header */}
+                            <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100 dark:border-slate-700/60">
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  id={`day-active-${day}`}
+                                  checked={true}
+                                  onChange={(e) =>
+                                    handleDayWiseScheduleChange(day, { isActive: e.target.checked })
+                                  }
+                                  className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
+                                />
+                                <label
+                                  htmlFor={`day-active-${day}`}
+                                  className="text-sm font-bold text-slate-900 dark:text-white cursor-pointer"
+                                >
+                                  {day}
+                                </label>
 
-                            {sched.isActive ? (
-                              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap text-xs">
-                                <div className="flex items-center gap-1">
-                                  <span className="text-[11px] text-slate-500">Start:</span>
-                                  <input
-                                    type="time"
-                                    value={sched.startTime || '07:00'}
-                                    onChange={(e) => {
-                                      const newStart = e.target.value;
-                                      const newEnd = calculateEndTime(newStart, sched.durationMinutes);
-                                      handleDayWiseScheduleChange(day, {
-                                        startTime: newStart,
-                                        endTime: newEnd,
-                                      });
-                                    }}
-                                    className="px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs text-slate-900 dark:text-white"
-                                  />
-                                </div>
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
+                                  {daySlots.length} {daySlots.length > 1 ? 'Sections / Periods' : 'Section'}
+                                </span>
 
-                                <div className="flex items-center gap-1">
-                                  <span className="text-[11px] text-slate-500">End:</span>
-                                  <input
-                                    type="time"
-                                    value={sched.endTime || '08:00'}
-                                    onChange={(e) => {
-                                      const newEnd = e.target.value;
-                                      const diff = calculateDurationMinutes(sched.startTime, newEnd);
-                                      handleDayWiseScheduleChange(day, {
-                                        endTime: newEnd,
-                                        durationMinutes: diff > 0 ? diff : sched.durationMinutes,
-                                      });
-                                    }}
-                                    className="px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs text-slate-900 dark:text-white"
-                                  />
-                                </div>
-
-                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 shrink-0">
-                                  {sched.durationMinutes}m
+                                <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                                  {totalDayMins} mins total
                                 </span>
                               </div>
-                            ) : (
-                              <span className="text-xs text-slate-400 italic">No class scheduled</span>
-                            )}
+
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyDayScheduleToActiveDays(day)}
+                                  title="Copy this day's sections and timings to other active days"
+                                  className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-slate-100 dark:bg-slate-700/70 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition"
+                                >
+                                  <Copy className="w-3 h-3 text-slate-500" />
+                                  <span>Copy to other days</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddDaySlot(day)}
+                                  className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 transition"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                  <span>Add Period</span>
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Period / Section Slots */}
+                            <div className="space-y-2.5">
+                              {daySlots.map((slot, slotIdx) => (
+                                <div
+                                  key={slot.slotId || slotIdx}
+                                  className="p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-900/50 space-y-2.5"
+                                >
+                                  {/* Slot Top: Period Title & Delete */}
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                                      <span className="w-4 h-4 rounded-full bg-indigo-600 text-white text-[9px] flex items-center justify-center font-bold">
+                                        {slotIdx + 1}
+                                      </span>
+                                      Period {slotIdx + 1}
+                                    </span>
+
+                                    {daySlots.length > 1 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveDaySlot(day, slotIdx)}
+                                        title="Remove this period/section"
+                                        className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  {/* Section Name & Room */}
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    <div>
+                                      <label className="block text-[10px] font-semibold text-slate-600 dark:text-slate-400 mb-0.5">
+                                        Section / Batch Name *
+                                      </label>
+                                      <input
+                                        type="text"
+                                        placeholder="e.g. Section A, Sec B, BIM-I"
+                                        value={slot.section || ''}
+                                        onChange={(e) =>
+                                          handleUpdateDaySlot(day, slotIdx, { section: e.target.value })
+                                        }
+                                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                      />
+
+                                      {/* Quick Preset Badges */}
+                                      <div className="flex flex-wrap items-center gap-1 mt-1">
+                                        {['Section A', 'Section B', 'Section C', 'Morning', 'Day', 'Lab'].map(
+                                          (chip) => (
+                                            <button
+                                              key={chip}
+                                              type="button"
+                                              onClick={() =>
+                                                handleUpdateDaySlot(day, slotIdx, { section: chip })
+                                              }
+                                              className={`text-[9px] px-1.5 py-0.5 rounded font-medium transition ${
+                                                slot.section === chip
+                                                  ? 'bg-indigo-600 text-white font-bold'
+                                                  : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600'
+                                              }`}
+                                            >
+                                              {chip}
+                                            </button>
+                                          )
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    <div>
+                                      <label className="block text-[10px] font-semibold text-slate-600 dark:text-slate-400 mb-0.5">
+                                        Room / Hall (Optional)
+                                      </label>
+                                      <input
+                                        type="text"
+                                        placeholder="e.g. Room 204, Science Lab"
+                                        value={slot.room || ''}
+                                        onChange={(e) =>
+                                          handleUpdateDaySlot(day, slotIdx, { room: e.target.value })
+                                        }
+                                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {/* Timings Row */}
+                                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-200/50 dark:border-slate-700/50">
+                                    <div className="flex items-center gap-2 flex-wrap text-xs">
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-[10px] text-slate-500">Start:</span>
+                                        <input
+                                          type="time"
+                                          value={slot.startTime || '07:00'}
+                                          onChange={(e) => {
+                                            const newStart = e.target.value;
+                                            const newEnd = calculateEndTime(newStart, slot.durationMinutes || 45);
+                                            handleUpdateDaySlot(day, slotIdx, {
+                                              startTime: newStart,
+                                              endTime: newEnd,
+                                            });
+                                          }}
+                                          className="px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white"
+                                        />
+                                      </div>
+
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-[10px] text-slate-500">End:</span>
+                                        <input
+                                          type="time"
+                                          value={slot.endTime || '07:45'}
+                                          onChange={(e) => {
+                                            const newEnd = e.target.value;
+                                            const diff = calculateDurationMinutes(slot.startTime, newEnd);
+                                            handleUpdateDaySlot(day, slotIdx, {
+                                              endTime: newEnd,
+                                              durationMinutes: diff > 0 ? diff : slot.durationMinutes,
+                                            });
+                                          }}
+                                          className="px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white"
+                                        />
+                                      </div>
+
+                                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300">
+                                        {slot.durationMinutes || 45}m
+                                      </span>
+                                    </div>
+
+                                    {/* Quick Duration Buttons */}
+                                    <div className="flex items-center gap-1">
+                                      {[35, 45, 50, 60, 90].map((dur) => (
+                                        <button
+                                          key={dur}
+                                          type="button"
+                                          onClick={() => {
+                                            const newEnd = calculateEndTime(slot.startTime, dur);
+                                            handleUpdateDaySlot(day, slotIdx, {
+                                              endTime: newEnd,
+                                              durationMinutes: dur,
+                                            });
+                                          }}
+                                          className={`px-1.5 py-0.5 text-[9px] font-semibold rounded transition ${
+                                            slot.durationMinutes === dur
+                                              ? 'bg-indigo-600 text-white'
+                                              : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600'
+                                          }`}
+                                        >
+                                          {dur}m
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Button to add another section for this day */}
+                            <button
+                              type="button"
+                              onClick={() => handleAddDaySlot(day)}
+                              className="w-full py-2 border border-dashed border-indigo-300 dark:border-indigo-800 rounded-lg text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/30 transition flex items-center justify-center gap-1.5"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>Add another section / period on {day}</span>
+                            </button>
                           </div>
                         );
                       })}

@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { getAttendanceStatusBadge, formatTime, exportToCsv } from '../utils/formatters';
 import { formatDisplayDate, getTodayIso, NEPALI_MONTHS_EN, adToBs, getDayOfWeek } from '../utils/nepaliCalendar';
-import { resolveClassSchedule } from '../utils/scheduleHelpers';
+import { resolveClassSchedule, resolveClassDaySlots } from '../utils/scheduleHelpers';
 import confetti from 'canvas-confetti';
 
 export const AttendanceView: React.FC = () => {
@@ -137,13 +137,14 @@ export const AttendanceView: React.FC = () => {
     status: AttendanceStatus
   ) => {
     let targetName = cls.title;
+    const sec = (cls as any).sectionName || cls.section;
     if (cls.type === 'home_tuition') {
       const student = students.find((s) => s.id === cls.studentId);
       if (student) targetName = student.name;
       if (cls.groupName) targetName = cls.groupName;
     } else if (cls.type === 'college') {
       const inst = institutions.find((i) => i.id === cls.institutionId);
-      if (inst) targetName = inst.name;
+      if (inst) targetName = sec ? `${inst.name} (${sec})` : inst.name;
     }
 
     markAttendance({
@@ -158,8 +159,10 @@ export const AttendanceView: React.FC = () => {
       endTime: cls.endTime,
       durationMinutes: cls.durationMinutes,
       periodsCount: cls.type === 'college' ? 1 : undefined,
+      section: sec,
+      sectionSlotId: (cls as any).sectionSlotId,
       status,
-      notes: `Marked as ${status}`,
+      notes: `Marked as ${status}${sec ? ` for ${sec}` : ''}`,
     });
 
     if (status === 'present') {
@@ -283,6 +286,11 @@ export const AttendanceView: React.FC = () => {
                         >
                           {cls.type === 'college' ? 'College' : 'Tuition'}
                         </span>
+                        {((cls as any).sectionName || cls.section) && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300">
+                            {(cls as any).sectionName || cls.section}
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-0.5">
                         {cls.title}
@@ -470,6 +478,11 @@ export const AttendanceView: React.FC = () => {
                           <span className="font-bold text-slate-900 dark:text-white">
                             {rec.targetName}
                           </span>
+                          {rec.section && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300">
+                              {rec.section}
+                            </span>
+                          )}
                         </div>
                       </td>
 
@@ -595,7 +608,7 @@ export const AttendanceView: React.FC = () => {
                     const cls = classes.find((c) => c.id === formData.classId);
                     if (!cls) return null;
                     const dow = getDayOfWeek(formData.date);
-                    const res = resolveClassSchedule(cls, dow, formData.date);
+                    const slots = resolveClassDaySlots(cls, dow, formData.date);
                     const hasOverride = cls.dateSpecificSchedules?.some((s) => s.date === formData.date);
                     return (
                       <span
@@ -606,7 +619,9 @@ export const AttendanceView: React.FC = () => {
                         }`}
                       >
                         {hasOverride ? '★ Date Override: ' : 'Routine: '}
-                        {formatTime(res.startTime)} - {formatTime(res.endTime)}
+                        {slots.length > 1
+                          ? `${slots.length} Sections / Periods`
+                          : `${formatTime(slots[0]?.startTime || cls.startTime)} - ${formatTime(slots[0]?.endTime || cls.endTime)}`}
                       </span>
                     );
                   })()}
@@ -616,16 +631,17 @@ export const AttendanceView: React.FC = () => {
                   onChange={(e) => {
                     const cls = classes.find((c) => c.id === e.target.value);
                     if (cls) {
+                      const dow = getDayOfWeek(formData.date);
+                      const daySlots = resolveClassDaySlots(cls, dow, formData.date);
+                      const firstSlot = daySlots[0];
                       let tName = cls.title;
                       if (cls.type === 'home_tuition') {
                         const st = students.find((s) => s.id === cls.studentId);
                         if (st) tName = st.name;
                       } else {
                         const inObj = institutions.find((i) => i.id === cls.institutionId);
-                        if (inObj) tName = inObj.name;
+                        if (inObj) tName = firstSlot?.section ? `${inObj.name} (${firstSlot.section})` : inObj.name;
                       }
-                      const dow = getDayOfWeek(formData.date);
-                      const res = resolveClassSchedule(cls, dow, formData.date);
                       setFormData({
                         ...formData,
                         classId: cls.id,
@@ -633,10 +649,12 @@ export const AttendanceView: React.FC = () => {
                         studentId: cls.studentId,
                         institutionId: cls.institutionId,
                         targetName: tName,
-                        subject: cls.subject,
-                        startTime: res.startTime,
-                        endTime: res.endTime,
-                        durationMinutes: res.durationMinutes,
+                        subject: firstSlot?.subject || cls.subject,
+                        startTime: firstSlot?.startTime || '07:00',
+                        endTime: firstSlot?.endTime || '08:00',
+                        durationMinutes: firstSlot?.durationMinutes || 60,
+                        section: firstSlot?.section,
+                        sectionSlotId: firstSlot?.slotId,
                       });
                     }
                   }}
@@ -649,6 +667,66 @@ export const AttendanceView: React.FC = () => {
                   ))}
                 </select>
               </div>
+
+              {/* Section / Period Selector when class has multiple slots on this date */}
+              {(() => {
+                const cls = classes.find((c) => c.id === formData.classId);
+                if (!cls) return null;
+                const dow = getDayOfWeek(formData.date);
+                const slots = resolveClassDaySlots(cls, dow, formData.date);
+                if (slots.length <= 1 && !slots[0]?.section) return null;
+
+                return (
+                  <div className="p-3 bg-indigo-50/50 dark:bg-indigo-950/30 rounded-xl border border-indigo-200 dark:border-indigo-800/40">
+                    <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
+                      Select Class Section / Period ({slots.length} scheduled today)
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {slots.map((s, idx) => {
+                        const isSelected =
+                          (formData.sectionSlotId === s.slotId) ||
+                          (!formData.sectionSlotId && idx === 0);
+                        return (
+                          <button
+                            key={s.slotId}
+                            type="button"
+                            onClick={() => {
+                              let tName = cls.title;
+                              if (cls.type === 'home_tuition') {
+                                const st = students.find((st) => st.id === cls.studentId);
+                                if (st) tName = st.name;
+                              } else {
+                                const inObj = institutions.find((i) => i.id === cls.institutionId);
+                                if (inObj) tName = s.section ? `${inObj.name} (${s.section})` : inObj.name;
+                              }
+                              setFormData({
+                                ...formData,
+                                section: s.section,
+                                sectionSlotId: s.slotId,
+                                startTime: s.startTime,
+                                endTime: s.endTime,
+                                durationMinutes: s.durationMinutes,
+                                targetName: tName,
+                                subject: s.subject || cls.subject,
+                              });
+                            }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
+                              isSelected
+                                ? 'bg-indigo-600 text-white shadow-xs'
+                                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-indigo-300'
+                            }`}
+                          >
+                            <span>{s.section || `Period ${idx + 1}`}</span>
+                            <span className="opacity-80 text-[10px]">
+                              ({formatTime(s.startTime)} - {formatTime(s.endTime)})
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>

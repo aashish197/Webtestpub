@@ -31,7 +31,7 @@ import {
 } from '../utils/sampleData';
 import { getTodayIso, adToBs, formatDualDate, calculatePaymentSchedule } from '../utils/nepaliCalendar';
 import { calculateGrade } from '../utils/formatters';
-import { resolveClassSchedule, DAYS_OF_WEEK } from '../utils/scheduleHelpers';
+import { resolveClassSchedule, resolveClassDaySlots, DAYS_OF_WEEK } from '../utils/scheduleHelpers';
 import {
   auth,
   db,
@@ -816,11 +816,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const batchMarkAttendanceToday = (status: AttendanceStatus) => {
     const todayIso = getTodayIso();
-    const days: DayOfWeek[] = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const currentDay = days[new Date().getDay()];
-    const todayClsList = classes.filter(c => c.isActive && c.scheduleDays.includes(currentDay));
 
-    todayClsList.forEach(cls => {
+    todayClasses.forEach(cls => {
       let targetName = cls.title;
       if (cls.type === 'home_tuition') {
         const student = students.find(s => s.id === cls.studentId);
@@ -828,7 +825,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (cls.groupName) targetName = cls.groupName;
       } else if (cls.type === 'college') {
         const inst = institutions.find(i => i.id === cls.institutionId);
-        if (inst) targetName = inst.name;
+        if (inst) {
+          const secName = (cls as any).sectionName || cls.section;
+          targetName = secName ? `${inst.name} (${secName})` : inst.name;
+        }
       }
 
       markAttendance({
@@ -843,8 +843,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         endTime: cls.endTime,
         durationMinutes: cls.durationMinutes,
         periodsCount: cls.type === 'college' ? 1 : undefined,
+        section: (cls as any).sectionName || cls.section,
+        sectionSlotId: (cls as any).sectionSlotId,
         status,
-        notes: `Batch marked as ${status}`,
+        notes: `Batch marked as ${status}${(cls as any).sectionName ? ` for ${(cls as any).sectionName}` : ''}`,
       });
     });
   };
@@ -1009,23 +1011,39 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const todayClasses = useMemo(() => {
     const todayIso = getTodayIso();
-    return classes
-      .filter(c => {
-        if (!c.isActive) return false;
-        const hasDateOverride = c.dateSpecificSchedules?.some(d => d.date === todayIso);
-        if (hasDateOverride) return true;
-        return c.scheduleDays.includes(todayDayName);
-      })
-      .map(c => {
-        const resolved = resolveClassSchedule(c, todayDayName, todayIso);
-        return {
+    const result: (TeachingClass & { sectionSlotId?: string; sectionName?: string })[] = [];
+
+    classes.forEach(c => {
+      if (!c.isActive) return;
+      const slots = resolveClassDaySlots(c, todayDayName, todayIso);
+      if (slots.length === 0) return;
+
+      slots.forEach((slot, idx) => {
+        const hasMultipleSlots = slots.length > 1;
+        const sectionLabel = slot.section || c.section;
+        const sectionSuffix = sectionLabel ? ` (${sectionLabel})` : '';
+        const titleWithSection = sectionLabel && !c.title.includes(sectionLabel)
+          ? `${c.title}${sectionSuffix}`
+          : c.title;
+
+        result.push({
           ...c,
-          startTime: resolved.startTime,
-          endTime: resolved.endTime,
-          durationMinutes: resolved.durationMinutes,
-        };
-      })
-      .sort((a, b) => a.startTime.localeCompare(b.startTime));
+          // Unique identifier for each period/section slot today
+          id: hasMultipleSlots ? `${c.id}__slot__${slot.slotId || idx}` : c.id,
+          title: titleWithSection,
+          subject: slot.subject || c.subject,
+          location: slot.room || c.location,
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+          durationMinutes: slot.durationMinutes,
+          section: sectionLabel,
+          sectionSlotId: slot.slotId,
+          sectionName: sectionLabel,
+        });
+      });
+    });
+
+    return result.sort((a, b) => a.startTime.localeCompare(b.startTime));
   }, [classes, todayDayName]);
 
   const activeStudentsCount = useMemo(() => {

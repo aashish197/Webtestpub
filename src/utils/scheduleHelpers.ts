@@ -24,6 +24,21 @@ export interface ResolvedClassSchedule {
   isScheduled: boolean;
   isDateOverride: boolean;
   note?: string;
+  section?: string;
+  slotId?: string;
+  slotsCount?: number;
+}
+
+export interface ResolvedClassSlot {
+  slotId: string;
+  section?: string;
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+  subject?: string;
+  room?: string;
+  note?: string;
+  isDateOverride?: boolean;
 }
 
 export interface ResolvedInstitutionSchedule {
@@ -63,7 +78,8 @@ export function calculateDurationMinutes(startTime: string, endTime: string): nu
 }
 
 /**
- * Resolves the active schedule for a TeachingClass on a given day or specific date
+ * Resolves the active schedule for a TeachingClass on a given day or specific date.
+ * Returns the primary/first scheduled slot if multi-period slots exist.
  */
 export function resolveClassSchedule(
   cls: TeachingClass,
@@ -81,6 +97,9 @@ export function resolveClassSchedule(
         isScheduled: true,
         isDateOverride: true,
         note: override.note,
+        section: cls.section,
+        slotId: override.id,
+        slotsCount: 1,
       };
     }
   }
@@ -97,8 +116,26 @@ export function resolveClassSchedule(
         isScheduled: false,
         isDateOverride: false,
         note: dayConfig.note,
+        section: dayConfig.section || cls.section,
       };
     }
+
+    // Check if slots array is defined with 1 or more sections
+    if (dayConfig.slots && dayConfig.slots.length > 0) {
+      const firstSlot = dayConfig.slots[0];
+      return {
+        startTime: firstSlot.startTime,
+        endTime: firstSlot.endTime,
+        durationMinutes: firstSlot.durationMinutes || calculateDurationMinutes(firstSlot.startTime, firstSlot.endTime),
+        isScheduled: true,
+        isDateOverride: false,
+        note: firstSlot.note || dayConfig.note,
+        section: firstSlot.section || dayConfig.section || cls.section,
+        slotId: firstSlot.id,
+        slotsCount: dayConfig.slots.length,
+      };
+    }
+
     // If marked active or in scheduleDays
     if (dayConfig.isActive === true || cls.scheduleDays.includes(day)) {
       return {
@@ -108,6 +145,8 @@ export function resolveClassSchedule(
         isScheduled: true,
         isDateOverride: false,
         note: dayConfig.note,
+        section: dayConfig.section || cls.section,
+        slotsCount: 1,
       };
     }
   }
@@ -120,6 +159,7 @@ export function resolveClassSchedule(
       durationMinutes: cls.durationMinutes || 60,
       isScheduled: false,
       isDateOverride: false,
+      section: cls.section,
     };
   }
 
@@ -131,7 +171,98 @@ export function resolveClassSchedule(
     isScheduled: true,
     isDateOverride: false,
     note: cls.notes,
+    section: cls.section,
+    slotsCount: 1,
   };
+}
+
+/**
+ * Resolves all scheduled section periods for a TeachingClass on a given day or specific date.
+ * Returns an array of slots (e.g. Section A at 07:00, Section B at 08:30).
+ */
+export function resolveClassDaySlots(
+  cls: TeachingClass,
+  day: DayOfWeek,
+  dateIso?: string
+): ResolvedClassSlot[] {
+  // 1. Check for specific date override first
+  if (dateIso && cls.dateSpecificSchedules && cls.dateSpecificSchedules.length > 0) {
+    const override = cls.dateSpecificSchedules.find((s) => s.date === dateIso);
+    if (override) {
+      return [
+        {
+          slotId: override.id,
+          section: cls.section,
+          startTime: override.startTime,
+          endTime: override.endTime,
+          durationMinutes: override.durationMinutes || cls.durationMinutes || 60,
+          subject: cls.subject,
+          room: cls.location,
+          note: override.note,
+          isDateOverride: true,
+        },
+      ];
+    }
+  }
+
+  // 2. Check for day-wise schedule
+  if (cls.scheduleType === 'day_wise' && cls.dayWiseSchedules && cls.dayWiseSchedules[day]) {
+    const dayConfig = cls.dayWiseSchedules[day]!;
+    if (dayConfig.isActive === false) {
+      return [];
+    }
+
+    if (dayConfig.slots && dayConfig.slots.length > 0) {
+      return dayConfig.slots.map((s, idx) => ({
+        slotId: s.id || `slot-${day}-${idx}`,
+        section: s.section || dayConfig.section || cls.section,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        durationMinutes: s.durationMinutes || calculateDurationMinutes(s.startTime, s.endTime),
+        subject: s.subject || cls.subject,
+        room: s.room || dayConfig.location || cls.location,
+        note: s.note || dayConfig.note,
+        isDateOverride: false,
+      }));
+    }
+
+    if (dayConfig.isActive === true || cls.scheduleDays.includes(day)) {
+      return [
+        {
+          slotId: `slot-${day}-0`,
+          section: dayConfig.section || cls.section,
+          startTime: dayConfig.startTime || cls.startTime || '07:00',
+          endTime: dayConfig.endTime || cls.endTime || '08:00',
+          durationMinutes: dayConfig.durationMinutes || cls.durationMinutes || 60,
+          subject: cls.subject,
+          room: dayConfig.location || cls.location,
+          note: dayConfig.note,
+          isDateOverride: false,
+        },
+      ];
+    }
+
+    return [];
+  }
+
+  // 3. Uniform schedule
+  if (!cls.scheduleDays.includes(day)) {
+    return [];
+  }
+
+  return [
+    {
+      slotId: `slot-${day}-0`,
+      section: cls.section,
+      startTime: cls.startTime || '07:00',
+      endTime: cls.endTime || '08:00',
+      durationMinutes: cls.durationMinutes || 60,
+      subject: cls.subject,
+      room: cls.location,
+      note: cls.notes,
+      isDateOverride: false,
+    },
+  ];
 }
 
 /**

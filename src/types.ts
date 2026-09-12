@@ -97,6 +97,18 @@ export interface Institution {
 
 export type ClassScheduleType = 'uniform' | 'day_wise' | 'date_specific';
 
+export interface ClassSectionSlot {
+  id: string;
+  slotId?: string;
+  section: string; // e.g. "Section A", "Sec B", "Grade 11-A", "BIM 2nd Sem"
+  startTime: string; // 'HH:MM'
+  endTime: string; // 'HH:MM'
+  durationMinutes: number;
+  subject?: string;
+  room?: string;
+  note?: string;
+}
+
 export interface DayWiseClassSchedule {
   day?: DayOfWeek;
   isActive?: boolean;
@@ -105,6 +117,8 @@ export interface DayWiseClassSchedule {
   durationMinutes?: number;
   location?: string;
   note?: string;
+  section?: string;
+  slots?: ClassSectionSlot[]; // Multiple section periods on this day
 }
 
 export interface DateSpecificClassSchedule {
@@ -136,6 +150,7 @@ export interface TeachingClass {
   startDate?: string; // ISO date 'YYYY-MM-DD' when class batch started
   endDate?: string;
   notes?: string;
+  section?: string; // Optional default section (e.g. 'Section A')
   isActive: boolean;
 
   // Flexible / Variable Scheduling
@@ -175,6 +190,8 @@ export interface AttendanceRecord {
   status: AttendanceStatus;
   notes?: string;
   topicsCovered?: string;
+  section?: string; // Specific section (e.g. 'Section A', 'Section B')
+  sectionSlotId?: string; // Id of the period/section slot
   recordedAt: string;
 }
 
