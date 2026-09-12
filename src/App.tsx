@@ -80,16 +80,16 @@ const MainContent: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100/70 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
+    <div className="min-h-screen bg-slate-100/70 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200 overflow-x-hidden w-full max-w-full">
       {/* Top Navigation */}
       <Navbar />
 
-      <div className="flex-1 flex overflow-hidden relative">
+      <div className="flex-1 flex overflow-hidden relative w-full max-w-full">
         {/* Left Sidebar (Desktop fixed/toggleable & Mobile Drawer) */}
         <Sidebar />
 
         {/* Main View Area */}
-        <main className="flex-1 overflow-y-auto p-3 sm:p-5 lg:p-8 pb-24 lg:pb-10 max-w-7xl w-full mx-auto">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-2.5 sm:p-5 lg:p-8 pb-20 lg:pb-10 max-w-7xl w-full mx-auto">
           {/* Top Breadcrumb & Back Navigation Header */}
           <ViewHeaderNav />
 

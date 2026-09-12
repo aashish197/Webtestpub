@@ -89,37 +89,24 @@ export const ViewHeaderNav: React.FC = () => {
 
   if (appMode === 'student') {
     return (
-      <div className="mb-6 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3 p-2.5 sm:px-4 sm:py-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={toggleSidebar}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 text-xs font-bold transition shadow-2xs hover:bg-purple-100"
-              title="Open Navigation Menu"
-            >
-              <Menu className="w-3.5 h-3.5" />
-              <span>Menu</span>
-            </button>
-
-            <ChevronRight className="w-3.5 h-3.5 text-slate-400 hidden sm:inline" />
-
-            {/* Current Page Badge */}
+      <div className="mb-4 sm:mb-6 space-y-3">
+        <div className="flex items-center justify-between gap-2 p-2 sm:px-4 sm:py-2.5 rounded-xl sm:rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+          <div className="flex items-center gap-2">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50/70 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 text-xs font-semibold">
               <GraduationCap className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-              <span>Student Learning & AI Hub</span>
+              <span>Student Learning Hub</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              id="btn-nav-switch-to-teacher"
-              onClick={() => setAppMode('teacher')}
-              className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/80 text-indigo-700 dark:text-indigo-300 text-xs font-bold transition flex items-center gap-1.5 shadow-2xs active:scale-95"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Switch to Teacher Mode</span>
-            </button>
-          </div>
+          <button
+            id="btn-nav-switch-to-teacher"
+            onClick={() => setAppMode('teacher')}
+            className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/80 text-indigo-700 dark:text-indigo-300 text-xs font-bold transition flex items-center gap-1.5 shadow-2xs active:scale-95 shrink-0"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Switch to Teacher Mode</span>
+            <span className="sm:hidden text-[11px]">Teacher Mode</span>
+          </button>
         </div>
       </div>
     );
@@ -129,25 +116,23 @@ export const ViewHeaderNav: React.FC = () => {
   const Icon = currentConfig.icon;
 
   return (
-    <div className="mb-6 space-y-3">
-      {/* Top Breadcrumb Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 p-2.5 sm:px-4 sm:py-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* If not on dashboard, show Back to Dashboard button */}
+    <div className={`mb-3 sm:mb-6 ${activeTab === 'dashboard' ? 'hidden sm:block' : 'block'}`}>
+      <div className="flex items-center justify-between gap-2 p-2 sm:px-4 sm:py-2.5 rounded-xl sm:rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+        <div className="flex items-center gap-2">
           {activeTab !== 'dashboard' ? (
             <button
               id="btn-back-to-dashboard"
               onClick={() => setActiveTab('dashboard')}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-slate-700 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 text-xs font-bold transition shadow-2xs group"
+              className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-slate-700 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 text-xs font-bold transition shadow-2xs group shrink-0"
               title="Return to main dashboard overview"
             >
-              <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" />
-              <span>Back to Dashboard</span>
+              <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform group-hover:-translate-x-0.5" />
+              <span>Dashboard</span>
             </button>
           ) : (
             <button
               onClick={toggleSidebar}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 text-xs font-bold transition shadow-2xs hover:bg-indigo-100"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 text-xs font-bold transition shadow-2xs hover:bg-indigo-100 shrink-0"
               title="Open Navigation Menu"
             >
               <Menu className="w-3.5 h-3.5" />
@@ -155,18 +140,18 @@ export const ViewHeaderNav: React.FC = () => {
             </button>
           )}
 
-          <ChevronRight className="w-3.5 h-3.5 text-slate-400 hidden sm:inline" />
+          <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
 
           {/* Current Page Badge */}
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50/70 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 text-xs font-semibold">
-            <Icon className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-            <span>{currentConfig.label}</span>
+          <div className="inline-flex items-center gap-1.5 px-2 py-1 sm:px-2.5 rounded-lg bg-indigo-50/70 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 text-xs font-semibold truncate">
+            <Icon className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+            <span className="truncate">{currentConfig.label}</span>
           </div>
         </div>
 
-        {/* Quick Tab Switcher Shortcuts */}
-        <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-1 sm:pb-0 scrollbar-none">
-          <span className="text-[11px] text-slate-600 dark:text-slate-300 font-semibold uppercase hidden md:inline mr-1">
+        {/* Quick Tab Switcher Shortcuts (Desktop only - mobile uses bottom navigation) */}
+        <div className="hidden lg:flex items-center gap-1.5 overflow-x-auto max-w-full pb-1 sm:pb-0 scrollbar-none">
+          <span className="text-[11px] text-slate-600 dark:text-slate-300 font-semibold uppercase mr-1">
             Jump to:
           </span>
           {[

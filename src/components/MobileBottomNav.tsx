@@ -91,21 +91,21 @@ export const MobileBottomNav: React.FC = () => {
       <button
         id="btn-bottom-tab-dashboard"
         onClick={() => setActiveTab('dashboard')}
-        className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition min-w-[50px] ${
+        className={`flex-1 min-w-0 flex flex-col items-center justify-center py-1 px-1 rounded-xl transition ${
           activeTab === 'dashboard'
             ? 'text-indigo-600 dark:text-indigo-400 font-bold'
             : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
         }`}
       >
         <LayoutDashboard className={`w-5 h-5 transition ${activeTab === 'dashboard' ? 'stroke-[2.5px] scale-105' : 'stroke-[1.8px]'}`} />
-        <span className="text-[10px] tracking-tight mt-0.5 whitespace-nowrap">Dashboard</span>
+        <span className="text-[10px] tracking-tight mt-0.5 truncate">Dashboard</span>
       </button>
 
       {/* 2. Routine */}
       <button
         id="btn-bottom-tab-routine"
         onClick={() => setActiveTab('routine')}
-        className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition relative min-w-[50px] ${
+        className={`flex-1 min-w-0 flex flex-col items-center justify-center py-1 px-1 rounded-xl transition relative ${
           activeTab === 'routine' || activeTab === 'classes'
             ? 'text-indigo-600 dark:text-indigo-400 font-bold'
             : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
@@ -119,14 +119,14 @@ export const MobileBottomNav: React.FC = () => {
             </span>
           )}
         </div>
-        <span className="text-[10px] tracking-tight mt-0.5 whitespace-nowrap">Routine</span>
+        <span className="text-[10px] tracking-tight mt-0.5 truncate">Routine</span>
       </button>
 
       {/* 3. Center Quick Add Button */}
       <button
         id="btn-bottom-quick-add"
         onClick={() => openQuickAction('student')}
-        className="flex flex-col items-center justify-center -mt-4 p-2.5 rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 hover:bg-indigo-700 active:scale-95 transition"
+        className="flex flex-col items-center justify-center -mt-4 p-2.5 rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 hover:bg-indigo-700 active:scale-95 transition shrink-0 mx-1"
         title="Quick Add Student, Payment, Class, etc."
         aria-label="Quick Add"
       >
@@ -137,21 +137,21 @@ export const MobileBottomNav: React.FC = () => {
       <button
         id="btn-bottom-tab-students"
         onClick={() => setActiveTab('students')}
-        className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition min-w-[50px] ${
+        className={`flex-1 min-w-0 flex flex-col items-center justify-center py-1 px-1 rounded-xl transition ${
           activeTab === 'students'
             ? 'text-indigo-600 dark:text-indigo-400 font-bold'
             : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
         }`}
       >
         <Users className={`w-5 h-5 transition ${activeTab === 'students' ? 'stroke-[2.5px] scale-105' : 'stroke-[1.8px]'}`} />
-        <span className="text-[10px] tracking-tight mt-0.5 whitespace-nowrap">Students</span>
+        <span className="text-[10px] tracking-tight mt-0.5 truncate">Students</span>
       </button>
 
       {/* 5. Payments */}
       <button
         id="btn-bottom-tab-payments"
         onClick={() => setActiveTab('payments')}
-        className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition relative min-w-[50px] ${
+        className={`flex-1 min-w-0 flex flex-col items-center justify-center py-1 px-1 rounded-xl transition relative ${
           activeTab === 'payments'
             ? 'text-indigo-600 dark:text-indigo-400 font-bold'
             : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
@@ -165,18 +165,18 @@ export const MobileBottomNav: React.FC = () => {
             </span>
           )}
         </div>
-        <span className="text-[10px] tracking-tight mt-0.5 whitespace-nowrap">Payments</span>
+        <span className="text-[10px] tracking-tight mt-0.5 truncate">Payments</span>
       </button>
 
       {/* 6. More Menu Trigger */}
       <button
         id="btn-bottom-menu-drawer"
         onClick={toggleSidebar}
-        className="flex flex-col items-center justify-center py-1 px-2 rounded-xl text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition min-w-[50px]"
+        className="flex-1 min-w-0 flex flex-col items-center justify-center py-1 px-1 rounded-xl text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition"
         aria-label="Open full menu"
       >
         <Menu className="w-5 h-5 stroke-[1.8px]" />
-        <span className="text-[10px] tracking-tight mt-0.5 whitespace-nowrap">More</span>
+        <span className="text-[10px] tracking-tight mt-0.5 truncate">More</span>
       </button>
     </nav>
   );

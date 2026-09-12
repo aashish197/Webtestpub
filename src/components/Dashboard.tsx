@@ -247,7 +247,7 @@ export const Dashboard: React.FC = () => {
   return (
     <div className="space-y-6 pb-10">
       {/* Welcome & Quick Action Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-gradient-to-r from-indigo-900 to-slate-900 dark:from-slate-900 dark:to-indigo-950 p-5 sm:p-6 rounded-2xl text-white shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 bg-gradient-to-r from-indigo-900 to-slate-900 dark:from-slate-900 dark:to-indigo-950 p-4 sm:p-6 rounded-2xl text-white shadow-sm">
         <div>
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 text-xs font-semibold border border-indigo-400/30">
@@ -267,56 +267,56 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {/* Quick Action Pills */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="grid grid-cols-3 sm:flex sm:flex-wrap items-center gap-1.5 sm:gap-2">
           <button
             id="btn-dash-add-student"
             onClick={() => openQuickAction('student')}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white transition active:scale-95"
+            className="flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 text-[11px] sm:text-xs font-semibold rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white transition active:scale-95 text-center"
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Add Student</span>
+            <Plus className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">Student</span>
           </button>
           <button
             id="btn-dash-record-payment"
             onClick={() => openQuickAction('payment')}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/30 text-emerald-200 transition active:scale-95"
+            className="flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 text-[11px] sm:text-xs font-semibold rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/30 text-emerald-200 transition active:scale-95 text-center"
           >
-            <CreditCard className="w-3.5 h-3.5" />
-            <span>Record Payment</span>
+            <CreditCard className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">Payment</span>
           </button>
           <button
             id="btn-dash-mark-attendance"
             onClick={() => setActiveTab('attendance')}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white transition active:scale-95"
+            className="flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 text-[11px] sm:text-xs font-semibold rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white transition active:scale-95 text-center"
           >
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>Mark Attendance</span>
+            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">Attendance</span>
           </button>
         </div>
       </div>
 
       {/* Main KPI Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         {/* Card 1: Today's Classes */}
         <div
           onClick={() => setActiveTab('routine')}
-          className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs hover:border-indigo-300 dark:hover:border-indigo-800 transition cursor-pointer"
+          className="p-3 sm:p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs hover:border-indigo-300 dark:hover:border-indigo-800 transition cursor-pointer"
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
               Classes Today
             </span>
-            <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400">
-              <Calendar className="w-4 h-4" />
+            <div className="p-1.5 sm:p-2 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400">
+              <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </div>
           </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-slate-900 dark:text-white">
+          <div className="mt-1.5 sm:mt-2 flex items-baseline gap-1.5 sm:gap-2">
+            <span className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
               {classesScheduledTodayCount}
             </span>
-            <span className="text-xs text-slate-500 dark:text-slate-400">scheduled</span>
+            <span className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400">scheduled</span>
           </div>
-          <div className="mt-2 text-[11px] text-indigo-600 dark:text-indigo-400 font-medium flex items-center gap-1">
+          <div className="mt-1.5 sm:mt-2 text-[11px] text-indigo-600 dark:text-indigo-400 font-medium flex items-center gap-1">
             <span>View Timetable</span>
             <ChevronRight className="w-3 h-3" />
           </div>
@@ -325,23 +325,23 @@ export const Dashboard: React.FC = () => {
         {/* Card 2: Active Students */}
         <div
           onClick={() => setActiveTab('students')}
-          className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs hover:border-teal-300 dark:hover:border-teal-800 transition cursor-pointer"
+          className="p-3 sm:p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs hover:border-teal-300 dark:hover:border-teal-800 transition cursor-pointer"
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
               Active Students
             </span>
-            <div className="p-2 rounded-lg bg-teal-50 dark:bg-teal-950/50 text-teal-600 dark:text-teal-400">
-              <Users className="w-4 h-4" />
+            <div className="p-1.5 sm:p-2 rounded-lg bg-teal-50 dark:bg-teal-950/50 text-teal-600 dark:text-teal-400">
+              <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </div>
           </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-slate-900 dark:text-white">
+          <div className="mt-1.5 sm:mt-2 flex items-baseline gap-1.5 sm:gap-2">
+            <span className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
               {activeStudentsCount}
             </span>
-            <span className="text-xs text-slate-500 dark:text-slate-400">home & group</span>
+            <span className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400">home & group</span>
           </div>
-          <div className="mt-2 text-[11px] text-teal-600 dark:text-teal-400 font-medium flex items-center gap-1">
+          <div className="mt-1.5 sm:mt-2 text-[11px] text-teal-600 dark:text-teal-400 font-medium flex items-center gap-1">
             <span>Manage Profiles</span>
             <ChevronRight className="w-3 h-3" />
           </div>
@@ -350,22 +350,22 @@ export const Dashboard: React.FC = () => {
         {/* Card 3: Monthly Tuition Income */}
         <div
           onClick={() => setActiveTab('income')}
-          className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs hover:border-emerald-300 dark:hover:border-emerald-800 transition cursor-pointer"
+          className="p-3 sm:p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs hover:border-emerald-300 dark:hover:border-emerald-800 transition cursor-pointer"
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
               Tuition Received
             </span>
-            <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400">
-              <CreditCard className="w-4 h-4" />
+            <div className="p-1.5 sm:p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400">
+              <CreditCard className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </div>
           </div>
-          <div className="mt-2">
-            <span className="text-2xl font-bold text-slate-900 dark:text-white">
+          <div className="mt-1.5 sm:mt-2">
+            <span className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
               {formatCurrency(currentMonthTuitionIncome.received, settings.currency)}
             </span>
           </div>
-          <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
+          <div className="mt-1.5 sm:mt-2 text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
             <span>Pending: {formatCurrency(currentMonthTuitionIncome.pending, settings.currency)}</span>
           </div>
         </div>
@@ -373,23 +373,23 @@ export const Dashboard: React.FC = () => {
         {/* Card 4: College Salary & Teaching Hours */}
         <div
           onClick={() => setActiveTab('income')}
-          className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs hover:border-purple-300 dark:hover:border-purple-800 transition cursor-pointer"
+          className="p-3 sm:p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs hover:border-purple-300 dark:hover:border-purple-800 transition cursor-pointer"
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              College & Total Hours
+              College & Hours
             </span>
-            <div className="p-2 rounded-lg bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400">
-              <Building2 className="w-4 h-4" />
+            <div className="p-1.5 sm:p-2 rounded-lg bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400">
+              <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </div>
           </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-slate-900 dark:text-white">
+          <div className="mt-1.5 sm:mt-2 flex items-baseline gap-1.5 sm:gap-2">
+            <span className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
               {totalWorkingHoursThisMonth}h
             </span>
-            <span className="text-xs text-slate-500 dark:text-slate-400">({totalClassesThisMonth} classes)</span>
+            <span className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400">({totalClassesThisMonth} cls)</span>
           </div>
-          <div className="mt-2 text-[11px] text-purple-600 dark:text-purple-400 font-medium flex items-center gap-1">
+          <div className="mt-1.5 sm:mt-2 text-[11px] text-purple-600 dark:text-purple-400 font-medium flex items-center gap-1">
             <span>Salary: {formatCurrency(currentMonthCollegeIncome.received, settings.currency)}</span>
             <ChevronRight className="w-3 h-3" />
           </div>
@@ -397,74 +397,73 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Workload, Rest & Multi-Tier Earnings Bar */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-4 sm:p-5 text-white shadow-xs border border-indigo-900/40">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-3.5 sm:p-5 text-white shadow-xs border border-indigo-900/40">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4">
           {/* Work vs Rest Section */}
-          <div className="flex flex-wrap items-center gap-4 sm:gap-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                <Clock className="w-5 h-5" />
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-3 sm:gap-6">
+            <div className="flex items-center gap-2.5 sm:gap-3">
+              <div className="p-2 sm:p-2.5 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shrink-0">
+                <Clock className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
-              <div>
-                <span className="text-[11px] uppercase tracking-wider text-indigo-300 font-semibold">
-                  Today's Teaching Load
+              <div className="min-w-0">
+                <span className="text-[10px] sm:text-[11px] uppercase tracking-wider text-indigo-300 font-semibold truncate block">
+                  Today's Teaching
                 </span>
-                <p className="text-xl font-bold text-white">
-                  {todayWorkHours} hrs <span className="text-xs font-normal text-slate-300">({todayWorkMinutes} mins)</span>
+                <p className="text-base sm:text-xl font-bold text-white leading-tight">
+                  {todayWorkHours} hrs <span className="text-[10px] sm:text-xs font-normal text-slate-300 hidden sm:inline">({todayWorkMinutes}m)</span>
                 </p>
               </div>
             </div>
 
             <div className="h-8 w-px bg-white/10 hidden sm:block" />
 
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                <Coffee className="w-5 h-5" />
+            <div className="flex items-center gap-2.5 sm:gap-3">
+              <div className="p-2 sm:p-2.5 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0">
+                <Coffee className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
-              <div>
-                <span className="text-[11px] uppercase tracking-wider text-emerald-300 font-semibold">
-                  Daily Rest & Recovery
+              <div className="min-w-0">
+                <span className="text-[10px] sm:text-[11px] uppercase tracking-wider text-emerald-300 font-semibold truncate block">
+                  Rest & Recovery
                 </span>
-                <p className="text-xl font-bold text-white">
-                  {todayRestHours} hrs <span className="text-xs font-normal text-slate-300">({Math.round((todayRestHours / 24) * 100)}% of day)</span>
+                <p className="text-base sm:text-xl font-bold text-white leading-tight">
+                  {todayRestHours} hrs <span className="text-[10px] sm:text-xs font-normal text-slate-300 hidden sm:inline">({Math.round((todayRestHours / 24) * 100)}%)</span>
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Earnings Per Hr / Day / Week / Month mini ticker */}
-          <div className="flex flex-wrap items-center gap-3 sm:gap-4 bg-white/5 rounded-xl p-2.5 sm:px-4 sm:py-2.5 border border-white/10">
-            <div>
-              <span className="text-[10px] text-slate-400 block uppercase font-medium">Per Hour</span>
-              <span className="text-xs sm:text-sm font-bold text-amber-300">
-                {formatCurrency(effectiveHourlyRate, settings.currency)}/hr
-              </span>
-            </div>
-            <span className="text-slate-600">•</span>
-            <div>
-              <span className="text-[10px] text-slate-400 block uppercase font-medium">Per Day</span>
-              <span className="text-xs sm:text-sm font-bold text-teal-300">
-                {formatCurrency(avgDailyIncome, settings.currency)}/day
-              </span>
-            </div>
-            <span className="text-slate-600">•</span>
-            <div>
-              <span className="text-[10px] text-slate-400 block uppercase font-medium">Per Week</span>
-              <span className="text-xs sm:text-sm font-bold text-indigo-300">
-                {formatCurrency(avgWeeklyIncome, settings.currency)}/wk
-              </span>
-            </div>
-            <span className="text-slate-600">•</span>
-            <div>
-              <span className="text-[10px] text-slate-400 block uppercase font-medium">Per Month</span>
-              <span className="text-xs sm:text-sm font-bold text-emerald-300">
-                {formatCurrency(projectedMonthlyIncome, settings.currency)}/mo
-              </span>
+          {/* Earnings Per Hr / Day / Week / Month ticker */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-4 bg-white/5 rounded-xl p-2.5 sm:px-4 sm:py-2.5 border border-white/10">
+            <div className="grid grid-cols-4 gap-2 text-center sm:text-left sm:flex sm:items-center sm:gap-3">
+              <div>
+                <span className="text-[9px] sm:text-[10px] text-slate-400 block uppercase font-medium">Per Hr</span>
+                <span className="text-xs sm:text-sm font-bold text-amber-300">
+                  {formatCurrency(effectiveHourlyRate, settings.currency)}
+                </span>
+              </div>
+              <div>
+                <span className="text-[9px] sm:text-[10px] text-slate-400 block uppercase font-medium">Per Day</span>
+                <span className="text-xs sm:text-sm font-bold text-teal-300">
+                  {formatCurrency(avgDailyIncome, settings.currency)}
+                </span>
+              </div>
+              <div>
+                <span className="text-[9px] sm:text-[10px] text-slate-400 block uppercase font-medium">Per Wk</span>
+                <span className="text-xs sm:text-sm font-bold text-indigo-300">
+                  {formatCurrency(avgWeeklyIncome, settings.currency)}
+                </span>
+              </div>
+              <div>
+                <span className="text-[9px] sm:text-[10px] text-slate-400 block uppercase font-medium">Per Mo</span>
+                <span className="text-xs sm:text-sm font-bold text-emerald-300">
+                  {formatCurrency(projectedMonthlyIncome, settings.currency)}
+                </span>
+              </div>
             </div>
 
             <button
               onClick={() => setActiveTab('calculator')}
-              className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-xs transition active:scale-95"
+              className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-xs transition active:scale-95 shrink-0"
             >
               <Sliders className="w-3.5 h-3.5" />
               <span>Full Calculator</span>

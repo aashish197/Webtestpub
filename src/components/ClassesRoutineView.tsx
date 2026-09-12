@@ -774,98 +774,100 @@ export const ClassesRoutineView: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-7 gap-2">
-            {DAYS_OF_WEEK.map((d) => (
-              <div
-                key={d}
-                className="text-center font-bold text-xs text-slate-500 py-1 border-b border-slate-100 dark:border-slate-800"
-              >
-                {d.slice(0, 3)}
-              </div>
-            ))}
+          <div className="overflow-x-auto -mx-2 sm:mx-0 px-2 sm:px-0">
+            <div className="min-w-[560px] md:min-w-0 grid grid-cols-7 gap-1.5 sm:gap-2">
+              {DAYS_OF_WEEK.map((d) => (
+                <div
+                  key={d}
+                  className="text-center font-bold text-xs text-slate-500 py-1 border-b border-slate-100 dark:border-slate-800"
+                >
+                  {d.slice(0, 3)}
+                </div>
+              ))}
 
-            {daysInMonthArray.map((dayObj, idx) => {
-              if (!dayObj.isCurrentMonth) {
+              {daysInMonthArray.map((dayObj, idx) => {
+                if (!dayObj.isCurrentMonth) {
+                  return (
+                    <div
+                      key={idx}
+                      className="min-h-[85px] p-1.5 rounded-xl bg-slate-50/30 dark:bg-slate-900/20 border border-transparent"
+                    />
+                  );
+                }
+
+                const isToday = dayObj.dateIso === getTodayIso();
+                
+                // Resolve active classes for this specific calendar date
+                const dayClassesForDate = classes
+                  .filter((c) => c.isActive)
+                  .map((c) => ({
+                    cls: c,
+                    resolved: resolveClassSchedule(c, dayObj.dayOfWeek, dayObj.dateIso),
+                  }))
+                  .filter((item) => item.resolved.isActive);
+
+                const dayPayments = payments.filter((p) => p.dueDate === dayObj.dateIso);
+
                 return (
                   <div
                     key={idx}
-                    className="min-h-[85px] p-1.5 rounded-xl bg-slate-50/30 dark:bg-slate-900/20 border border-transparent"
-                  />
-                );
-              }
-
-              const isToday = dayObj.dateIso === getTodayIso();
-              
-              // Resolve active classes for this specific calendar date
-              const dayClassesForDate = classes
-                .filter((c) => c.isActive)
-                .map((c) => ({
-                  cls: c,
-                  resolved: resolveClassSchedule(c, dayObj.dayOfWeek, dayObj.dateIso),
-                }))
-                .filter((item) => item.resolved.isActive);
-
-              const dayPayments = payments.filter((p) => p.dueDate === dayObj.dateIso);
-
-              return (
-                <div
-                  key={idx}
-                  className={`min-h-[85px] p-2 rounded-xl border transition flex flex-col justify-between ${
-                    isToday
-                      ? 'bg-indigo-50/50 dark:bg-indigo-950/30 border-indigo-300 dark:border-indigo-700'
-                      : 'bg-white dark:bg-slate-800/50 border-slate-200 dark:border-slate-700/60'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span
-                      className={`text-xs font-bold ${
-                        isToday
-                          ? 'w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center'
-                          : 'text-slate-800 dark:text-slate-200'
-                      }`}
-                    >
-                      {dayObj.dayNum}
-                    </span>
-                    {settings.dateSystem === 'BS' && (
-                      <span className="text-[10px] text-slate-400">
-                        {adToBs(dayObj.dateIso).day}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="space-y-1 my-1">
-                    {dayClassesForDate.slice(0, 2).map(({ cls, resolved }) => (
-                      <div
-                        key={cls.id}
-                        className="text-[9px] font-semibold px-1.5 py-0.5 rounded truncate text-white flex items-center gap-1"
-                        style={{ backgroundColor: cls.color || '#3b82f6' }}
-                        title={`${cls.title} (${resolved.startTime} - ${resolved.endTime})${resolved.isDateOverride ? ` [Special: ${resolved.note || 'Override'}]` : ''}`}
+                    className={`min-h-[85px] p-2 rounded-xl border transition flex flex-col justify-between ${
+                      isToday
+                        ? 'bg-indigo-50/50 dark:bg-indigo-950/30 border-indigo-300 dark:border-indigo-700'
+                        : 'bg-white dark:bg-slate-800/50 border-slate-200 dark:border-slate-700/60'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={`text-xs font-bold ${
+                          isToday
+                            ? 'w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center'
+                            : 'text-slate-800 dark:text-slate-200'
+                        }`}
                       >
-                        {resolved.isDateOverride && <Sparkles className="w-2.5 h-2.5 shrink-0 text-amber-200" />}
-                        <span className="truncate">
-                          {formatTime(resolved.startTime, settings.timeFormat)} {cls.subject}
+                        {dayObj.dayNum}
+                      </span>
+                      {settings.dateSystem === 'BS' && (
+                        <span className="text-[10px] text-slate-400">
+                          {adToBs(dayObj.dateIso).day}
                         </span>
-                      </div>
-                    ))}
-                    {dayClassesForDate.length > 2 && (
-                      <span className="text-[9px] text-slate-400 font-bold block">
-                        +{dayClassesForDate.length - 2} more
-                      </span>
-                    )}
+                      )}
+                    </div>
 
-                    {dayPayments.map((p) => (
-                      <div
-                        key={p.id}
-                        className="text-[9px] font-bold px-1 py-0.5 rounded bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-300 truncate"
-                        title={`Due: ${p.targetName}`}
-                      >
-                        Due: {p.targetName.slice(0, 10)}..
-                      </div>
-                    ))}
+                    <div className="space-y-1 my-1">
+                      {dayClassesForDate.slice(0, 2).map(({ cls, resolved }) => (
+                        <div
+                          key={cls.id}
+                          className="text-[9px] font-semibold px-1.5 py-0.5 rounded truncate text-white flex items-center gap-1"
+                          style={{ backgroundColor: cls.color || '#3b82f6' }}
+                          title={`${cls.title} (${resolved.startTime} - ${resolved.endTime})${resolved.isDateOverride ? ` [Special: ${resolved.note || 'Override'}]` : ''}`}
+                        >
+                          {resolved.isDateOverride && <Sparkles className="w-2.5 h-2.5 shrink-0 text-amber-200" />}
+                          <span className="truncate">
+                            {formatTime(resolved.startTime, settings.timeFormat)} {cls.subject}
+                          </span>
+                        </div>
+                      ))}
+                      {dayClassesForDate.length > 2 && (
+                        <span className="text-[9px] text-slate-400 font-bold block">
+                          +{dayClassesForDate.length - 2} more
+                        </span>
+                      )}
+
+                      {dayPayments.map((p) => (
+                        <div
+                          key={p.id}
+                          className="text-[9px] font-bold px-1 py-0.5 rounded bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-300 truncate"
+                          title={`Due: ${p.targetName}`}
+                        >
+                          Due: {p.targetName.slice(0, 10)}..
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
