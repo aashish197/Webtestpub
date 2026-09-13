@@ -75,6 +75,7 @@ export const ClassesRoutineView: React.FC = () => {
     attendance,
     markAttendance,
     payments,
+    showToast,
   } = useApp();
 
   const [routineViewMode, setRoutineViewMode] = useState<'weekly' | 'daily' | 'monthly' | 'all'>('weekly');
@@ -546,8 +547,10 @@ export const ClassesRoutineView: React.FC = () => {
 
     if (editingClass) {
       updateClass(editingClass.id, payload);
+      showToast('Routine Updated & Synced', 'success', payload.title);
     } else {
       addClass(payload);
+      showToast('Routine Added & Synced', 'success', `${payload.title} has been saved and synced.`);
     }
     setIsAddModalOpen(false);
   };

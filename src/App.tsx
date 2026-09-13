@@ -9,6 +9,7 @@ import { QuickActionModal } from './components/QuickActionModal';
 import { AuthModal } from './components/AuthModal';
 import { GlobalSearchModal } from './components/GlobalSearchModal';
 import { ResetConfirmationModal } from './components/ResetConfirmationModal';
+import { ToastNotification } from './components/ToastNotification';
 import { Dashboard } from './components/Dashboard';
 import { StudentsView } from './components/StudentsView';
 import { InstitutionsView } from './components/InstitutionsView';
@@ -119,6 +120,9 @@ const MainContent: React.FC = () => {
         onClose={closeResetModal}
         initialType={resetModalInitialType}
       />
+
+      {/* Real-time Global Sync & Operation Toast Notifications */}
+      <ToastNotification />
     </div>
   );
 };

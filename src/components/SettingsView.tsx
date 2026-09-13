@@ -40,6 +40,8 @@ export const SettingsView: React.FC = () => {
     openAuthModal,
     syncStatus,
     syncDataToCloud,
+    triggerManualSync,
+    lastSyncedAt,
     isSyncing,
     logout,
   } = useApp();
@@ -163,6 +165,11 @@ export const SettingsView: React.FC = () => {
                 <p className="text-[10px] text-slate-400 font-mono mt-0.5">
                   Firestore UID: {currentUser.uid}
                 </p>
+                {lastSyncedAt && (
+                  <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">
+                    Last Cloud Sync: {lastSyncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -170,11 +177,11 @@ export const SettingsView: React.FC = () => {
               <button
                 type="button"
                 id="btn-settings-sync-now"
-                onClick={() => syncDataToCloud()}
+                onClick={() => triggerManualSync()}
                 disabled={isSyncing}
-                className="px-3 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition flex items-center gap-1.5 disabled:opacity-50"
+                className="px-3 py-2 text-xs font-semibold rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition flex items-center gap-1.5 disabled:opacity-50 active:scale-95 shadow-xs"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-indigo-600' : ''}`} />
                 <span>{isSyncing ? 'Syncing...' : 'Sync to Cloud Now'}</span>
               </button>
               <button

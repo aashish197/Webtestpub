@@ -42,8 +42,16 @@ import {
   signOutUser,
   onAuthStateChanged,
   User as FirebaseUser,
+  cleanForFirestore,
 } from '../lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+
+export interface ToastItem {
+  id: number;
+  message: string;
+  subtitle?: string;
+  type: 'success' | 'error' | 'info';
+}
 
 interface AppContextType {
   // Navigation & UI state
@@ -87,12 +95,19 @@ interface AppContextType {
   isAuthLoading: boolean;
   isSyncing: boolean;
   syncStatus: 'idle' | 'syncing' | 'synced' | 'error';
+  lastSyncedAt: Date | null;
   loginWithGoogle: () => Promise<void>;
   loginWithEmail: (email: string, password: string) => Promise<void>;
   signupWithEmail: (email: string, password: string, displayName?: string) => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
   logout: () => Promise<void>;
-  syncDataToCloud: () => Promise<void>;
+  syncDataToCloud: (overrideData?: any) => Promise<boolean>;
+  triggerManualSync: () => Promise<boolean>;
+
+  // Toast feedback
+  toast: ToastItem | null;
+  showToast: (message: string, type?: 'success' | 'error' | 'info', subtitle?: string) => void;
+  dismissToast: () => void;
 
   // State Entities
   settings: TeacherSettings;
@@ -486,6 +501,144 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     localStorage.setItem(STORAGE_KEYS.STUDENT_PROFILE, JSON.stringify(studentProfile));
   }, [studentProfile]);
 
+  // Toast feedback state
+  const [toast, setToast] = useState<ToastItem | null>(null);
+  const toastTimerRef = useRef<any>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info', subtitle?: string) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ id: Date.now(), message, type, subtitle });
+    toastTimerRef.current = setTimeout(() => {
+      setToast(null);
+    }, 4000);
+  };
+
+  const dismissToast = () => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast(null);
+  };
+
+  // Last synced timestamp
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(() => {
+    try {
+      const saved = localStorage.getItem('teacher_last_cloud_sync');
+      return saved ? new Date(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  // Direct References to latest state values to avoid stale closures in async sync handlers
+  const settingsRef = useRef(settings);
+  useEffect(() => { settingsRef.current = settings; }, [settings]);
+
+  const studentsRef = useRef(students);
+  useEffect(() => { studentsRef.current = students; }, [students]);
+
+  const institutionsRef = useRef(institutions);
+  useEffect(() => { institutionsRef.current = institutions; }, [institutions]);
+
+  const classesRef = useRef(classes);
+  useEffect(() => { classesRef.current = classes; }, [classes]);
+
+  const attendanceRef = useRef(attendance);
+  useEffect(() => { attendanceRef.current = attendance; }, [attendance]);
+
+  const paymentsRef = useRef(payments);
+  useEffect(() => { paymentsRef.current = payments; }, [payments]);
+
+  const performanceRef = useRef(performance);
+  useEffect(() => { performanceRef.current = performance; }, [performance]);
+
+  const currentUserRef = useRef(currentUser);
+  useEffect(() => { currentUserRef.current = currentUser; }, [currentUser]);
+
+  // Function to manually or automatically sync state to Cloud Firestore
+  const syncDataToCloud = async (overrideData?: {
+    classes?: TeachingClass[];
+    students?: Student[];
+    institutions?: Institution[];
+    attendance?: AttendanceRecord[];
+    payments?: PaymentRecord[];
+    performance?: PerformanceRecord[];
+    settings?: TeacherSettings;
+  }): Promise<boolean> => {
+    const activeUser = currentUserRef.current;
+    if (!activeUser) {
+      return false;
+    }
+
+    setIsSyncing(true);
+    setSyncStatus('syncing');
+
+    try {
+      const docRef = doc(db, 'users', activeUser.uid, 'data', 'main');
+
+      const dataToSave = {
+        settings: overrideData?.settings ?? settingsRef.current,
+        students: overrideData?.students ?? studentsRef.current,
+        institutions: (overrideData?.institutions ?? institutionsRef.current).map(sanitizeInstitution),
+        classes: (overrideData?.classes ?? classesRef.current).map(sanitizeTeachingClass),
+        attendance: overrideData?.attendance ?? attendanceRef.current,
+        payments: overrideData?.payments ?? paymentsRef.current,
+        performance: overrideData?.performance ?? performanceRef.current,
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Ensure all undefined fields are eliminated recursively
+      const cleanData = cleanForFirestore(dataToSave);
+
+      await setDoc(docRef, cleanData, { merge: true });
+
+      const now = new Date();
+      setLastSyncedAt(now);
+      try {
+        localStorage.setItem('teacher_last_cloud_sync', now.toISOString());
+      } catch {
+        // ignore
+      }
+
+      setSyncStatus('synced');
+      return true;
+    } catch (err: any) {
+      console.error('Failed to sync to cloud:', err);
+      setSyncStatus('error');
+      return false;
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const triggerManualSync = async (): Promise<boolean> => {
+    if (!currentUserRef.current) {
+      showToast(
+        'Sign in to Sync Routines',
+        'info',
+        'Please sign in with your Google account to back up and sync your routines across devices.'
+      );
+      openAuthModal();
+      return false;
+    }
+
+    showToast('Syncing with Google Cloud...', 'info', 'Uploading all routines, tuition classes, and records...');
+    const ok = await syncDataToCloud();
+    if (ok) {
+      const routineCount = classesRef.current.length;
+      showToast(
+        'Synced with Google Cloud',
+        'success',
+        `All ${routineCount} routine${routineCount === 1 ? '' : 's'} and timetable records are safely backed up.`
+      );
+    } else {
+      showToast(
+        'Sync Error',
+        'error',
+        'Could not reach Firestore cloud database. Your data is safely saved in local storage.'
+      );
+    }
+    return ok;
+  };
+
   // Firebase Auth listener and Cloud sync
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user: FirebaseUser | null) => {
@@ -498,6 +651,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           photoURL: user.photoURL,
         };
         setCurrentUser(authUser);
+        currentUserRef.current = authUser;
 
         // Fetch data from Firestore
         try {
@@ -506,31 +660,113 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
           if (docSnap.exists()) {
             const data = docSnap.data();
-            if (data.settings) setSettings(prev => ({ ...prev, ...data.settings }));
-            if (Array.isArray(data.students)) setStudents(data.students);
-            if (Array.isArray(data.institutions)) setInstitutions(data.institutions.map(sanitizeInstitution));
-            if (Array.isArray(data.classes)) setClasses(data.classes.map(sanitizeTeachingClass));
-            if (Array.isArray(data.attendance)) setAttendance(data.attendance);
-            if (Array.isArray(data.payments)) setPayments(data.payments);
-            if (Array.isArray(data.performance)) setPerformance(data.performance);
+
+            // Smart Merge Classes/Routines (prevent refresh from wiping new local routines)
+            const cloudClasses: TeachingClass[] = Array.isArray(data.classes)
+              ? data.classes.map(sanitizeTeachingClass)
+              : [];
+            let localClasses: TeachingClass[] = [];
+            try {
+              const saved = localStorage.getItem(STORAGE_KEYS.CLASSES);
+              if (saved) localClasses = JSON.parse(saved).map(sanitizeTeachingClass);
+            } catch {
+              localClasses = classesRef.current;
+            }
+            const cloudClassIds = new Set(cloudClasses.map(c => c.id));
+            const newLocalClasses = localClasses.filter(c => !cloudClassIds.has(c.id));
+            const mergedClasses = [...cloudClasses, ...newLocalClasses];
+            setClasses(mergedClasses);
+            classesRef.current = mergedClasses;
+            localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(mergedClasses));
+
+            // Smart Merge Students
+            const cloudStudents: Student[] = Array.isArray(data.students) ? data.students : [];
+            let localStudents: Student[] = [];
+            try {
+              const saved = localStorage.getItem(STORAGE_KEYS.STUDENTS);
+              if (saved) localStudents = JSON.parse(saved);
+            } catch {
+              localStudents = studentsRef.current;
+            }
+            const cloudStudentIds = new Set(cloudStudents.map(s => s.id));
+            const newLocalStudents = localStudents.filter(s => !cloudStudentIds.has(s.id));
+            const mergedStudents = [...cloudStudents, ...newLocalStudents];
+            setStudents(mergedStudents);
+            studentsRef.current = mergedStudents;
+            localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(mergedStudents));
+
+            // Smart Merge Institutions
+            const cloudInstitutions: Institution[] = Array.isArray(data.institutions)
+              ? data.institutions.map(sanitizeInstitution)
+              : [];
+            let localInstitutions: Institution[] = [];
+            try {
+              const saved = localStorage.getItem(STORAGE_KEYS.INSTITUTIONS);
+              if (saved) localInstitutions = JSON.parse(saved).map(sanitizeInstitution);
+            } catch {
+              localInstitutions = institutionsRef.current;
+            }
+            const cloudInstIds = new Set(cloudInstitutions.map(i => i.id));
+            const newLocalInstitutions = localInstitutions.filter(i => !cloudInstIds.has(i.id));
+            const mergedInstitutions = [...cloudInstitutions, ...newLocalInstitutions];
+            setInstitutions(mergedInstitutions);
+            institutionsRef.current = mergedInstitutions;
+            localStorage.setItem(STORAGE_KEYS.INSTITUTIONS, JSON.stringify(mergedInstitutions));
+
+            // Attendance, Payments, Performance, Settings
+            if (Array.isArray(data.attendance)) {
+              setAttendance(data.attendance);
+              attendanceRef.current = data.attendance;
+            }
+            if (Array.isArray(data.payments)) {
+              setPayments(data.payments);
+              paymentsRef.current = data.payments;
+            }
+            if (Array.isArray(data.performance)) {
+              setPerformance(data.performance);
+              performanceRef.current = data.performance;
+            }
+            if (data.settings) {
+              setSettings(prev => ({ ...prev, ...data.settings }));
+            }
+
+            const now = new Date();
+            setLastSyncedAt(now);
             setSyncStatus('synced');
+
+            // If there were local additions that weren't in the cloud yet, push immediately
+            if (newLocalClasses.length > 0 || newLocalStudents.length > 0 || newLocalInstitutions.length > 0) {
+              const syncPayload = cleanForFirestore({
+                settings: data.settings || settingsRef.current,
+                students: mergedStudents,
+                institutions: mergedInstitutions,
+                classes: mergedClasses,
+                attendance: data.attendance || attendanceRef.current,
+                payments: data.payments || paymentsRef.current,
+                performance: data.performance || performanceRef.current,
+                updatedAt: new Date().toISOString(),
+              });
+              setDoc(docRef, syncPayload, { merge: true }).catch(err => console.error('Cloud auto-upload error:', err));
+            }
           } else {
             // First time login: upload initial/current state to Cloud
-            await setDoc(docRef, {
+            const initialPayload = cleanForFirestore({
               settings: {
-                ...settings,
-                email: user.email || settings.email,
-                teacherName: user.displayName || settings.teacherName,
+                ...settingsRef.current,
+                email: user.email || settingsRef.current.email,
+                teacherName: user.displayName || settingsRef.current.teacherName,
               },
-              students,
-              institutions,
-              classes,
-              attendance,
-              payments,
-              performance,
+              students: studentsRef.current,
+              institutions: institutionsRef.current,
+              classes: classesRef.current,
+              attendance: attendanceRef.current,
+              payments: paymentsRef.current,
+              performance: performanceRef.current,
               updatedAt: new Date().toISOString(),
             });
+            await setDoc(docRef, initialPayload);
             setSyncStatus('synced');
+            setLastSyncedAt(new Date());
           }
         } catch (err) {
           console.error('Error fetching cloud data:', err);
@@ -538,6 +774,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
       } else {
         setCurrentUser(null);
+        currentUserRef.current = null;
         setSyncStatus('idle');
       }
       setIsAuthLoading(false);
@@ -546,36 +783,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     return () => unsubscribe();
   }, []);
-
-  // Function to manually or automatically sync state to Cloud Firestore
-  const syncDataToCloud = async () => {
-    if (!currentUser) return;
-    setIsSyncing(true);
-    setSyncStatus('syncing');
-    try {
-      const docRef = doc(db, 'users', currentUser.uid, 'data', 'main');
-      await setDoc(
-        docRef,
-        {
-          settings,
-          students,
-          institutions,
-          classes,
-          attendance,
-          payments,
-          performance,
-          updatedAt: new Date().toISOString(),
-        },
-        { merge: true }
-      );
-      setSyncStatus('synced');
-    } catch (err) {
-      console.error('Failed to sync to cloud:', err);
-      setSyncStatus('error');
-    } finally {
-      setIsSyncing(false);
-    }
-  };
 
   // Auto-sync debounced changes when user is logged in
   useEffect(() => {
@@ -661,21 +868,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Settings Actions
   const updateSettings = (newSettings: Partial<TeacherSettings>) => {
-    setSettings(prev => ({ ...prev, ...newSettings }));
+    const updated = { ...settingsRef.current, ...newSettings };
+    settingsRef.current = updated;
+    setSettings(updated);
+    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(updated));
+    if (currentUserRef.current) {
+      syncDataToCloud({ settings: updated });
+    }
   };
 
   const toggleDateSystem = () => {
-    setSettings(prev => ({
-      ...prev,
-      dateSystem: prev.dateSystem === 'AD' ? 'BS' : 'AD',
-    }));
+    const nextSystem = settingsRef.current.dateSystem === 'AD' ? 'BS' : 'AD';
+    updateSettings({ dateSystem: nextSystem });
   };
 
   const toggleTheme = () => {
-    setSettings(prev => {
-      const nextTheme = isDarkMode ? 'light' : 'dark';
-      return { ...prev, theme: nextTheme };
-    });
+    const nextTheme = isDarkMode ? 'light' : 'dark';
+    updateSettings({ theme: nextTheme });
   };
 
   // Student Actions
@@ -683,10 +892,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const newStudent: Student = {
       ...studentData,
       startDate: studentData.startDate || getTodayIso(),
-      id: `std-${Date.now()}`,
+      id: `std-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       createdAt: new Date().toISOString(),
     };
-    setStudents(prev => [newStudent, ...prev]);
+    const updatedStudents = [newStudent, ...studentsRef.current];
+    studentsRef.current = updatedStudents;
+    setStudents(updatedStudents);
+    localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(updatedStudents));
 
     // Also optionally generate initial payment pending record
     const today = new Date();
@@ -722,61 +934,134 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }`,
         recordedAt: new Date().toISOString(),
       };
-      setPayments(prev => [newPay, ...prev]);
+      const updatedPayments = [newPay, ...paymentsRef.current];
+      paymentsRef.current = updatedPayments;
+      setPayments(updatedPayments);
+      localStorage.setItem(STORAGE_KEYS.PAYMENTS, JSON.stringify(updatedPayments));
+      if (currentUserRef.current) {
+        syncDataToCloud({ students: updatedStudents, payments: updatedPayments });
+      }
+    } else if (currentUserRef.current) {
+      syncDataToCloud({ students: updatedStudents });
     }
 
     return newStudent;
   };
 
   const updateStudent = (id: string, data: Partial<Student>) => {
-    setStudents(prev => prev.map(s => (s.id === id ? { ...s, ...data } : s)));
+    const updated = studentsRef.current.map(s => (s.id === id ? { ...s, ...data } : s));
+    studentsRef.current = updated;
+    setStudents(updated);
+    localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(updated));
+
     // Also update student names in classes/attendance if changed
     if (data.name) {
-      setClasses(prev => prev.map(c => c.studentId === id ? { ...c, title: c.title.replace(s => s, data.name!) } : c));
+      const updatedClasses = classesRef.current.map(c => c.studentId === id ? { ...c, title: c.title.replace(s => s, data.name!) } : c);
+      classesRef.current = updatedClasses;
+      setClasses(updatedClasses);
+      localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(updatedClasses));
+      if (currentUserRef.current) {
+        syncDataToCloud({ students: updated, classes: updatedClasses });
+      }
+    } else if (currentUserRef.current) {
+      syncDataToCloud({ students: updated });
     }
   };
 
   const deleteStudent = (id: string) => {
-    setStudents(prev => prev.filter(s => s.id !== id));
-    setClasses(prev => prev.filter(c => c.studentId !== id));
+    const updatedStudents = studentsRef.current.filter(s => s.id !== id);
+    const updatedClasses = classesRef.current.filter(c => c.studentId !== id);
+    studentsRef.current = updatedStudents;
+    classesRef.current = updatedClasses;
+    setStudents(updatedStudents);
+    setClasses(updatedClasses);
+    localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(updatedStudents));
+    localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(updatedClasses));
+    if (currentUserRef.current) {
+      syncDataToCloud({ students: updatedStudents, classes: updatedClasses });
+    }
   };
 
   // Institution Actions
   const addInstitution = (instData: Omit<Institution, 'id' | 'createdAt'>): Institution => {
     const newInst: Institution = sanitizeInstitution({
       ...instData,
-      id: `inst-${Date.now()}`,
+      id: `inst-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       createdAt: new Date().toISOString(),
     });
-    setInstitutions(prev => [newInst, ...prev]);
+    const updated = [newInst, ...institutionsRef.current];
+    institutionsRef.current = updated;
+    setInstitutions(updated);
+    localStorage.setItem(STORAGE_KEYS.INSTITUTIONS, JSON.stringify(updated));
+    if (currentUserRef.current) {
+      syncDataToCloud({ institutions: updated });
+    }
     return newInst;
   };
 
   const updateInstitution = (id: string, data: Partial<Institution>) => {
-    setInstitutions(prev => prev.map(i => (i.id === id ? sanitizeInstitution({ ...i, ...data }) : i)));
+    const updated = institutionsRef.current.map(i => (i.id === id ? sanitizeInstitution({ ...i, ...data }) : i));
+    institutionsRef.current = updated;
+    setInstitutions(updated);
+    localStorage.setItem(STORAGE_KEYS.INSTITUTIONS, JSON.stringify(updated));
+    if (currentUserRef.current) {
+      syncDataToCloud({ institutions: updated });
+    }
   };
 
   const deleteInstitution = (id: string) => {
-    setInstitutions(prev => prev.filter(i => i.id !== id));
-    setClasses(prev => prev.filter(c => c.institutionId !== id));
+    const updatedInsts = institutionsRef.current.filter(i => i.id !== id);
+    const updatedClasses = classesRef.current.filter(c => c.institutionId !== id);
+    institutionsRef.current = updatedInsts;
+    classesRef.current = updatedClasses;
+    setInstitutions(updatedInsts);
+    setClasses(updatedClasses);
+    localStorage.setItem(STORAGE_KEYS.INSTITUTIONS, JSON.stringify(updatedInsts));
+    localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(updatedClasses));
+    if (currentUserRef.current) {
+      syncDataToCloud({ institutions: updatedInsts, classes: updatedClasses });
+    }
   };
 
-  // Class Actions
+  // Class Actions - Automatic Immediate Persistence and Cloud Synchronization
   const addClass = (clsData: Omit<TeachingClass, 'id'>): TeachingClass => {
     const newCls: TeachingClass = sanitizeTeachingClass({
       ...clsData,
-      id: `cls-${Date.now()}`,
+      id: `cls-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
     });
-    setClasses(prev => [newCls, ...prev]);
+    const updated = [newCls, ...classesRef.current];
+    classesRef.current = updated;
+    setClasses(updated);
+    localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(updated));
+
+    // Immediately trigger cloud sync so new tuition routines are never lost on reload
+    if (currentUserRef.current) {
+      syncDataToCloud({ classes: updated });
+    }
+
     return newCls;
   };
 
   const updateClass = (id: string, data: Partial<TeachingClass>) => {
-    setClasses(prev => prev.map(c => (c.id === id ? sanitizeTeachingClass({ ...c, ...data }) : c)));
+    const updated = classesRef.current.map(c => (c.id === id ? sanitizeTeachingClass({ ...c, ...data }) : c));
+    classesRef.current = updated;
+    setClasses(updated);
+    localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(updated));
+
+    if (currentUserRef.current) {
+      syncDataToCloud({ classes: updated });
+    }
   };
 
   const deleteClass = (id: string) => {
-    setClasses(prev => prev.filter(c => c.id !== id));
+    const updated = classesRef.current.filter(c => c.id !== id);
+    classesRef.current = updated;
+    setClasses(updated);
+    localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(updated));
+
+    if (currentUserRef.current) {
+      syncDataToCloud({ classes: updated });
+    }
   };
 
   // Attendance Actions
@@ -1651,12 +1936,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         isAuthLoading,
         isSyncing,
         syncStatus,
+        lastSyncedAt,
         loginWithGoogle,
         loginWithEmail,
         signupWithEmail,
         sendPasswordReset,
         logout,
         syncDataToCloud,
+        triggerManualSync,
+        toast,
+        showToast,
+        dismissToast,
 
         settings,
         updateSettings,
