@@ -90,6 +90,7 @@ export const StudentsView: React.FC = () => {
     paymentReceivingDay: 1,
     dueDays: 5,
     paymentDueDay: 6,
+    deductLeaveFee: false,
     notes: '',
     status: 'active',
   };
@@ -156,6 +157,7 @@ export const StudentsView: React.FC = () => {
       paymentReceivingDay: student.paymentReceivingDay || 1,
       dueDays: student.dueDays !== undefined ? student.dueDays : 5,
       paymentDueDay: student.paymentDueDay || ((student.paymentReceivingDay || 1) + (student.dueDays !== undefined ? student.dueDays : 5)),
+      deductLeaveFee: student.deductLeaveFee ?? false,
       notes: student.notes || '',
       status: student.status,
     });
@@ -1018,6 +1020,29 @@ export const StudentsView: React.FC = () => {
                         Rs. {Math.round(((formData.classDurationMinutes || 60) / 60) * (formData.feeAmount || 0))}
                       </span>
                     </div>
+                  </div>
+                )}
+
+                {/* Leave Fee Deduction Policy */}
+                {formData.feeStructure === 'monthly' && (
+                  <div className="mt-3 p-3 rounded-xl bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 flex items-start gap-2.5">
+                    <input
+                      type="checkbox"
+                      id="student_deductLeaveFee"
+                      checked={formData.deductLeaveFee ?? false}
+                      onChange={(e) =>
+                        setFormData({ ...formData, deductLeaveFee: e.target.checked })
+                      }
+                      className="mt-1 rounded text-teal-600 focus:ring-teal-500 w-4 h-4 cursor-pointer"
+                    />
+                    <label htmlFor="student_deductLeaveFee" className="text-xs cursor-pointer select-none">
+                      <span className="font-bold text-slate-800 dark:text-slate-200 block">
+                        Deduct monthly fee for student leaves / absences (Optional)
+                      </span>
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
+                        For monthly tuition, salary is <strong>not deducted for absent</strong> unless chosen by the teacher. (Tuition on hourly basis will always calculate based on exact hours conducted).
+                      </span>
+                    </label>
                   </div>
                 )}
               </div>

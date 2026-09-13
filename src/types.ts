@@ -1,7 +1,7 @@
 export type DateSystem = 'AD' | 'BS';
 export type TimeFormat = '12h' | '24h';
 export type TuitionType = 'individual' | 'group';
-export type FeeStructureType = 'monthly' | 'per_class' | 'hourly' | 'per_period' | 'custom';
+export type FeeStructureType = 'monthly' | 'per_class' | 'hourly' | 'per_period' | 'semester' | 'custom';
 export type PaymentMethod = 'Cash' | 'eSewa' | 'Khalti' | 'Bank Transfer' | 'PhonePe/UPI' | 'Cheque' | 'Other';
 export type PaymentStatus = 'paid' | 'partially_paid' | 'partial' | 'pending' | 'overdue';
 export type PaymentType = 'tuition' | 'tuition_fee' | 'college_salary';
@@ -38,6 +38,7 @@ export interface Student {
   attendancePercentage?: number;
   pendingBalance?: number;
   notes?: string;
+  deductLeaveFee?: boolean; // Optional: whether to deduct tuition fee for missed classes/leaves
   status: 'active' | 'inactive';
   createdAt: string;
 }
@@ -71,8 +72,11 @@ export interface Institution {
   numberOfPeriods: number; // e.g. 2 periods per day (uniform or average)
   periodDurationMinutes: number; // e.g. 45
   workingDays: DayOfWeek[];
-  paymentStructure: FeeStructureType; // 'monthly' | 'per_period' | 'hourly' | 'custom'
-  rateAmount: number; // e.g. 35000 / month or 850 / period
+  paymentStructure: FeeStructureType; // 'monthly' | 'per_period' | 'hourly' | 'semester' | 'custom'
+  rateAmount: number; // e.g. 35000 / month, 850 / period, or 180000 / semester
+  semesterDurationMonths?: number; // e.g. 6 months for 1 semester (default 6)
+  semesterName?: string; // e.g. "1st Semester", "Spring 2026"
+  deductLeaveSalary?: boolean; // Optional: whether salary is deducted for absent/leave (default false)
   extraClassRate?: number; // e.g. 1000 / period
   startDate: string;
   endDate?: string;
@@ -151,6 +155,8 @@ export interface TeachingClass {
   endDate?: string;
   notes?: string;
   section?: string; // Optional default section (e.g. 'Section A')
+  semesterDurationMonths?: number; // e.g. 6 months for college semester
+  semesterName?: string; // e.g. "1st Semester"
   isActive: boolean;
 
   // Flexible / Variable Scheduling
@@ -183,15 +189,25 @@ export interface AttendanceRecord {
   institutionId?: string; // for college
   targetName: string;
   subject: string;
-  startTime: string;
-  endTime: string;
-  durationMinutes: number;
+  startTime: string; // Effective or actual start time
+  endTime: string; // Effective or actual end time
+  durationMinutes: number; // Actual conducted duration
+  scheduledStartTime?: string; // Originally scheduled start time
+  scheduledEndTime?: string; // Originally scheduled end time
+  actualStartTime?: string; // Actual time teaching commenced
+  actualEndTime?: string; // Actual time teaching finished
+  actualDurationMinutes?: number; // Actual hours/minutes taught
   periodsCount?: number; // for college classes
   status: AttendanceStatus;
   notes?: string;
   topicsCovered?: string;
   section?: string; // Specific section (e.g. 'Section A', 'Section B')
   sectionSlotId?: string; // Id of the period/section slot
+  isRescheduled?: boolean;
+  rescheduledToDate?: string; // Target rescheduled date
+  rescheduledToTime?: string; // Target rescheduled time
+  rescheduledReason?: string; // Reason or discussion note with student
+  deductSalary?: boolean; // Whether leave is marked for salary deduction
   recordedAt: string;
 }
 

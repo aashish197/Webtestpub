@@ -54,6 +54,11 @@ export const WorkloadEarningsCalculator: React.FC = () => {
   const [simCollegeSalary, setSimCollegeSalary] = useState<number>(40000);
   const [calculatorMode, setCalculatorMode] = useState<'hourly' | 'student_college'>('hourly');
 
+  // Per Tuition & Per College Detailed Salary Audit States
+  const [salaryFilterMonth, setSalaryFilterMonth] = useState<string>(() => getTodayIso().slice(0, 7));
+  const [overrideDeductLeaves, setOverrideDeductLeaves] = useState<Record<string, boolean>>({});
+  const [salaryCategoryFilter, setSalaryCategoryFilter] = useState<'all' | 'colleges' | 'tuitions'>('all');
+
   // --- 1. WORK & REST METRICS FOR SELECTED DAY ---
   const daySchedule = useMemo(() => {
     // Classes scheduled on this day of week
@@ -222,7 +227,10 @@ export const WorkloadEarningsCalculator: React.FC = () => {
     let collegeMonthlyTotal = 0;
     institutions.forEach((inst) => {
       if (inst.status === 'active') {
-        if (inst.paymentStructure === 'monthly') {
+        if (inst.paymentStructure === 'semester') {
+          const semMonths = inst.semesterDurationMonths || 6;
+          collegeMonthlyTotal += Math.round(inst.rateAmount / semMonths);
+        } else if (inst.paymentStructure === 'monthly') {
           collegeMonthlyTotal += inst.rateAmount;
         } else if (inst.paymentStructure === 'per_period') {
           const weeklyPeriods: number =
@@ -325,6 +333,204 @@ export const WorkloadEarningsCalculator: React.FC = () => {
       dayEarningsBreakdown,
     };
   }, [students, institutions, classes, payments]);
+
+  // --- 2b. DETAILED AUDIT: PER TUITION & PER COLLEGE SALARY CALCULATION ---
+  const detailedSalaryBreakdown = useMemo(() => {
+    // 1. Process Colleges / Institutions
+    const collegeRows = institutions.map((inst) => {
+      const instAttendance = attendance.filter(
+        (a) => a.institutionId === inst.id && a.date.startsWith(salaryFilterMonth)
+      );
+
+      const presentRecords = instAttendance.filter((a) => a.status === 'present');
+      const absentRecords = instAttendance.filter((a) => a.status === 'absent');
+      const rescheduledRecords = instAttendance.filter((a) => a.status === 'rescheduled');
+
+      const daysTaken = new Set(presentRecords.map((a) => a.date)).size;
+      const periodsTaken = presentRecords.reduce((sum, a) => sum + (a.periodsCount || 1), 0);
+      const totalMins = presentRecords.reduce(
+        (sum, a) => sum + (a.actualDurationMinutes || a.durationMinutes || 0),
+        0
+      );
+      const hoursTaken = Number((totalMins / 60).toFixed(1));
+      const leavesCount = absentRecords.length;
+      const rescheduledCount = rescheduledRecords.length;
+
+      // User override or institution setting
+      const deductLeaves =
+        overrideDeductLeaves[inst.id] !== undefined
+          ? overrideDeductLeaves[inst.id]
+          : (inst.deductLeaveSalary ?? false);
+
+      let nominalMonthlyRate = 0;
+      let calculatedSalary = 0;
+      let deductionAmount = 0;
+      let perDayRate = 0;
+      let structureLabel = '';
+
+      if (inst.paymentStructure === 'semester') {
+        const semDuration = inst.semesterDurationMonths || 6;
+        nominalMonthlyRate = Math.round(inst.rateAmount / semDuration);
+        structureLabel = `Semester (${semDuration} Mos Fixed: ${formatCurrency(inst.rateAmount, settings.currency)})`;
+        perDayRate = Math.round(nominalMonthlyRate / 26);
+        deductionAmount = deductLeaves ? leavesCount * perDayRate : 0;
+        calculatedSalary = Math.max(0, nominalMonthlyRate - deductionAmount);
+      } else if (inst.paymentStructure === 'monthly') {
+        nominalMonthlyRate = inst.rateAmount;
+        structureLabel = 'Monthly Fixed Salary';
+        perDayRate = Math.round(nominalMonthlyRate / 26);
+        deductionAmount = deductLeaves ? leavesCount * perDayRate : 0;
+        calculatedSalary = Math.max(0, nominalMonthlyRate - deductionAmount);
+      } else if (inst.paymentStructure === 'per_period') {
+        structureLabel = `Per Period (${formatCurrency(inst.rateAmount, settings.currency)}/pd)`;
+        calculatedSalary = periodsTaken * inst.rateAmount;
+      } else if (inst.paymentStructure === 'hourly') {
+        structureLabel = `Hourly Rate (${formatCurrency(inst.rateAmount, settings.currency)}/hr)`;
+        calculatedSalary = Math.round((totalMins / 60) * inst.rateAmount);
+      } else {
+        structureLabel = 'Custom Contract';
+        calculatedSalary = inst.rateAmount;
+      }
+
+      // Payments received for this institution in this month
+      const paidThisMonth = payments
+        .filter(
+          (p) =>
+            p.institutionId === inst.id &&
+            (p.periodMonthYear === salaryFilterMonth || p.paymentDate.startsWith(salaryFilterMonth))
+        )
+        .reduce((sum, p) => sum + p.amountPaid, 0);
+
+      const dueAmount = Math.max(0, calculatedSalary - paidThisMonth);
+
+      return {
+        id: inst.id,
+        type: 'college' as const,
+        name: inst.name,
+        subtitle: `${inst.facultyOrGrade}${inst.section ? ` • Sec ${inst.section}` : ''}`,
+        paymentStructure: inst.paymentStructure,
+        structureLabel,
+        rateAmount: inst.rateAmount,
+        semesterDurationMonths: inst.semesterDurationMonths,
+        semesterName: inst.semesterName,
+        nominalMonthlyRate,
+        daysTaken,
+        periodsTaken,
+        totalMins,
+        hoursTaken,
+        leavesCount,
+        rescheduledCount,
+        deductLeaves,
+        perDayRate,
+        deductionAmount,
+        calculatedSalary,
+        paidThisMonth,
+        dueAmount,
+      };
+    });
+
+    // 2. Process Home Tuition Students
+    const tuitionRows = students.map((st) => {
+      const stAttendance = attendance.filter(
+        (a) => a.studentId === st.id && a.date.startsWith(salaryFilterMonth)
+      );
+
+      const presentRecords = stAttendance.filter((a) => a.status === 'present');
+      const absentRecords = stAttendance.filter((a) => a.status === 'absent');
+      const rescheduledRecords = stAttendance.filter((a) => a.status === 'rescheduled');
+
+      const daysTaken = new Set(presentRecords.map((a) => a.date)).size;
+      const sessionsTaken = presentRecords.length;
+      const totalMins = presentRecords.reduce(
+        (sum, a) => sum + (a.actualDurationMinutes || a.durationMinutes || 0),
+        0
+      );
+      const hoursTaken = Number((totalMins / 60).toFixed(1));
+      const leavesCount = absentRecords.length;
+      const rescheduledCount = rescheduledRecords.length;
+
+      // User override or student setting
+      const deductLeaves =
+        overrideDeductLeaves[st.id] !== undefined
+          ? overrideDeductLeaves[st.id]
+          : (st.deductLeaveFee ?? false);
+
+      let calculatedSalary = 0;
+      let deductionAmount = 0;
+      let perDayRate = 0;
+      let structureLabel = '';
+
+      if (st.feeStructure === 'hourly') {
+        // Hourly tuition MUST be calculated strictly based on how many hours were conducted!
+        structureLabel = `Hourly (${formatCurrency(st.feeAmount, settings.currency)}/hr)`;
+        calculatedSalary = Math.round((totalMins / 60) * st.feeAmount);
+      } else if (st.feeStructure === 'monthly') {
+        structureLabel = `Monthly Tuition (${formatCurrency(st.feeAmount, settings.currency)}/mo)`;
+        perDayRate = Math.round(st.feeAmount / 24);
+        deductionAmount = deductLeaves ? leavesCount * perDayRate : 0;
+        calculatedSalary = Math.max(0, st.feeAmount - deductionAmount);
+      } else if (st.feeStructure === 'per_class') {
+        structureLabel = `Per Session (${formatCurrency(st.feeAmount, settings.currency)}/session)`;
+        calculatedSalary = sessionsTaken * st.feeAmount;
+      } else {
+        structureLabel = 'Fixed Fee';
+        calculatedSalary = st.feeAmount;
+      }
+
+      // Payments received for this student in this month
+      const paidThisMonth = payments
+        .filter(
+          (p) =>
+            p.studentId === st.id &&
+            (p.periodMonthYear === salaryFilterMonth || p.paymentDate.startsWith(salaryFilterMonth))
+        )
+        .reduce((sum, p) => sum + p.amountPaid, 0);
+
+      const dueAmount = Math.max(0, calculatedSalary - paidThisMonth);
+
+      return {
+        id: st.id,
+        type: 'tuition' as const,
+        name: st.name,
+        subtitle: `${st.grade} • ${st.subjects?.join(', ')}`,
+        paymentStructure: st.feeStructure,
+        structureLabel,
+        rateAmount: st.feeAmount,
+        daysTaken,
+        periodsTaken: sessionsTaken,
+        totalMins,
+        hoursTaken,
+        leavesCount,
+        rescheduledCount,
+        deductLeaves,
+        perDayRate,
+        deductionAmount,
+        calculatedSalary,
+        paidThisMonth,
+        dueAmount,
+      };
+    });
+
+    const allRows = [...collegeRows, ...tuitionRows];
+    const totalCalculatedSalary = allRows.reduce((sum, r) => sum + r.calculatedSalary, 0);
+    const totalPaid = allRows.reduce((sum, r) => sum + r.paidThisMonth, 0);
+    const totalDue = allRows.reduce((sum, r) => sum + r.dueAmount, 0);
+    const totalConductedHours = Number(allRows.reduce((sum, r) => sum + r.hoursTaken, 0).toFixed(1));
+    const totalPeriodsOrSessions = allRows.reduce((sum, r) => sum + r.periodsTaken, 0);
+    const totalLeavesAcross = allRows.reduce((sum, r) => sum + r.leavesCount, 0);
+
+    return {
+      collegeRows,
+      tuitionRows,
+      allRows,
+      totalCalculatedSalary,
+      totalPaid,
+      totalDue,
+      totalConductedHours,
+      totalPeriodsOrSessions,
+      totalLeavesAcross,
+    };
+  }, [institutions, students, attendance, payments, salaryFilterMonth, overrideDeductLeaves, settings]);
 
   // --- 3. DYNAMIC SIMULATOR COMPUTATION ---
   const simulatedOutput = useMemo(() => {
@@ -585,6 +791,364 @@ export const WorkloadEarningsCalculator: React.FC = () => {
               );
             })}
           </div>
+        </div>
+      </div>
+
+      {/* --- MODULE: PER-TUITION & PER-COLLEGE SALARY BREAKDOWN & WORKLOAD AUDIT --- */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+          <div>
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
+                <Building2 className="w-5 h-5" />
+              </div>
+              <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
+                Per-Tuition & College Salary Calculation
+              </h2>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              Detailed breakdown of days taken, periods/hours conducted, leaves, and optional salary deductions for semester, monthly, and hourly classes.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Month Picker */}
+            <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
+              <Calendar className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+              <label className="font-semibold text-slate-600 dark:text-slate-300">Month:</label>
+              <input
+                type="month"
+                value={salaryFilterMonth}
+                onChange={(e) => setSalaryFilterMonth(e.target.value)}
+                className="bg-transparent text-slate-900 dark:text-white font-bold text-xs focus:outline-none cursor-pointer"
+              />
+            </div>
+
+            {/* Category Filter Pills */}
+            <div className="flex items-center p-0.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-semibold">
+              <button
+                onClick={() => setSalaryCategoryFilter('all')}
+                className={`px-3 py-1 rounded-lg transition ${
+                  salaryCategoryFilter === 'all'
+                    ? 'bg-white dark:bg-slate-700 text-purple-700 dark:text-purple-300 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400'
+                }`}
+              >
+                All ({detailedSalaryBreakdown.allRows.length})
+              </button>
+              <button
+                onClick={() => setSalaryCategoryFilter('colleges')}
+                className={`px-3 py-1 rounded-lg transition ${
+                  salaryCategoryFilter === 'colleges'
+                    ? 'bg-white dark:bg-slate-700 text-purple-700 dark:text-purple-300 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400'
+                }`}
+              >
+                Colleges ({detailedSalaryBreakdown.collegeRows.length})
+              </button>
+              <button
+                onClick={() => setSalaryCategoryFilter('tuitions')}
+                className={`px-3 py-1 rounded-lg transition ${
+                  salaryCategoryFilter === 'tuitions'
+                    ? 'bg-white dark:bg-slate-700 text-purple-700 dark:text-purple-300 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400'
+                }`}
+              >
+                Tuitions ({detailedSalaryBreakdown.tuitionRows.length})
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Aggregate Rollup for Selected Month */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="p-3.5 rounded-xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200/80 dark:border-purple-900/60">
+            <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider block">
+              Total Calculated
+            </span>
+            <p className="text-base sm:text-lg font-black text-purple-950 dark:text-purple-100 mt-0.5">
+              {formatCurrency(detailedSalaryBreakdown.totalCalculatedSalary, settings.currency)}
+            </p>
+            <span className="text-[10px] text-purple-700 dark:text-purple-300 mt-0.5 block">
+              Net payable for month
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-900/60">
+            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">
+              Paid Received
+            </span>
+            <p className="text-base sm:text-lg font-black text-emerald-900 dark:text-emerald-100 mt-0.5">
+              {formatCurrency(detailedSalaryBreakdown.totalPaid, settings.currency)}
+            </p>
+            <span className="text-[10px] text-emerald-700 dark:text-emerald-300 mt-0.5 block">
+              Recorded in payments
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/60">
+            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider block">
+              Outstanding Due
+            </span>
+            <p className="text-base sm:text-lg font-black text-amber-900 dark:text-amber-100 mt-0.5">
+              {formatCurrency(detailedSalaryBreakdown.totalDue, settings.currency)}
+            </p>
+            <span className="text-[10px] text-amber-700 dark:text-amber-300 mt-0.5 block">
+              Remaining to collect
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200/80 dark:border-indigo-900/60">
+            <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider block">
+              Conducted Hours
+            </span>
+            <p className="text-base sm:text-lg font-black text-indigo-900 dark:text-indigo-100 mt-0.5">
+              {detailedSalaryBreakdown.totalConductedHours} hrs
+            </p>
+            <span className="text-[10px] text-indigo-700 dark:text-indigo-300 mt-0.5 block">
+              Exact teaching time
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/80 dark:border-blue-900/60">
+            <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider block">
+              Periods & Sessions
+            </span>
+            <p className="text-base sm:text-lg font-black text-blue-900 dark:text-blue-100 mt-0.5">
+              {detailedSalaryBreakdown.totalPeriodsOrSessions}
+            </p>
+            <span className="text-[10px] text-blue-700 dark:text-blue-300 mt-0.5 block">
+              Total classes delivered
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-rose-50/70 dark:bg-rose-950/30 border border-rose-200/80 dark:border-rose-900/60">
+            <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider block">
+              Total Leaves Taken
+            </span>
+            <p className="text-base sm:text-lg font-black text-rose-900 dark:text-rose-100 mt-0.5">
+              {detailedSalaryBreakdown.totalLeavesAcross}
+            </p>
+            <span className="text-[10px] text-rose-700 dark:text-rose-300 mt-0.5 block">
+              Absences in month
+            </span>
+          </div>
+        </div>
+
+        {/* Entities Cards Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {(salaryCategoryFilter === 'colleges'
+            ? detailedSalaryBreakdown.collegeRows
+            : salaryCategoryFilter === 'tuitions'
+            ? detailedSalaryBreakdown.tuitionRows
+            : detailedSalaryBreakdown.allRows
+          ).map((item) => (
+            <div
+              key={`${item.type}-${item.id}`}
+              className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 hover:border-purple-300 dark:hover:border-purple-700 transition flex flex-col justify-between space-y-3"
+            >
+              <div>
+                {/* Header: Type, Title, Badge */}
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`p-1 rounded-lg text-xs ${
+                          item.type === 'college'
+                            ? 'bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300'
+                            : 'bg-teal-100 dark:bg-teal-900/60 text-teal-700 dark:text-teal-300'
+                        }`}
+                      >
+                        {item.type === 'college' ? (
+                          <Building2 className="w-4 h-4" />
+                        ) : (
+                          <Users className="w-4 h-4" />
+                        )}
+                      </span>
+                      <h4 className="font-bold text-sm text-slate-900 dark:text-white">
+                        {item.name}
+                      </h4>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 ml-6">
+                      {item.subtitle}
+                    </p>
+                  </div>
+
+                  <span
+                    className={`px-2.5 py-1 text-[11px] font-bold rounded-lg ${
+                      item.paymentStructure === 'semester'
+                        ? 'bg-purple-200/70 dark:bg-purple-900/60 text-purple-900 dark:text-purple-200 border border-purple-300 dark:border-purple-700'
+                        : item.paymentStructure === 'hourly'
+                        ? 'bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-800'
+                        : 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-800'
+                    }`}
+                  >
+                    {item.structureLabel}
+                  </span>
+                </div>
+
+                {/* Workload Metrics for this Month */}
+                <div className="mt-3 grid grid-cols-4 gap-2 text-center p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700/80">
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase block">
+                      Days Taken
+                    </span>
+                    <span className="text-xs font-black text-slate-900 dark:text-white">
+                      {item.daysTaken} days
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase block">
+                      {item.type === 'college' ? 'Periods' : 'Sessions'}
+                    </span>
+                    <span className="text-xs font-black text-indigo-600 dark:text-indigo-400">
+                      {item.periodsTaken}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase block">
+                      Hours Taken
+                    </span>
+                    <span className="text-xs font-black text-slate-900 dark:text-white">
+                      {item.hoursTaken} hrs
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase block">
+                      Leaves
+                    </span>
+                    <span
+                      className={`text-xs font-black ${
+                        item.leavesCount > 0
+                          ? 'text-rose-600 dark:text-rose-400'
+                          : 'text-emerald-600 dark:text-emerald-400'
+                      }`}
+                    >
+                      {item.leavesCount} days
+                    </span>
+                  </div>
+                </div>
+
+                {/* Rescheduled notes if any */}
+                {item.rescheduledCount > 0 && (
+                  <div className="mt-2 text-[11px] text-amber-700 dark:text-amber-300 flex items-center gap-1.5 px-2 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-900/60">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                    <span>
+                      {item.rescheduledCount} class{item.rescheduledCount !== 1 ? 'es' : ''} rescheduled this month.
+                    </span>
+                  </div>
+                )}
+
+                {/* Salary Calculation details & Leave Deduction Switch */}
+                <div className="mt-3 p-2.5 rounded-xl bg-slate-100/70 dark:bg-slate-900/70 border border-slate-200/80 dark:border-slate-800 space-y-2">
+                  {/* Calculation logic description */}
+                  {item.paymentStructure === 'semester' && (
+                    <div className="text-[11px] text-purple-900 dark:text-purple-200 space-y-0.5">
+                      <div className="flex justify-between">
+                        <span>Semester Term: <strong>{item.semesterName || '1st Semester'}</strong> ({item.semesterDurationMonths || 6} months)</span>
+                        <span className="font-bold">Total: {formatCurrency(item.rateAmount, settings.currency)}</span>
+                      </div>
+                      <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                        <span>Pro-rated Monthly Allocation:</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">
+                          {formatCurrency(item.nominalMonthlyRate, settings.currency)}/mo
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {item.paymentStructure === 'hourly' && (
+                    <div className="text-[11px] text-amber-900 dark:text-amber-200 flex justify-between items-center">
+                      <span>Formula: {item.hoursTaken} hrs conducted × {formatCurrency(item.rateAmount, settings.currency)}/hr</span>
+                      <span className="font-black text-xs">
+                        = {formatCurrency(item.calculatedSalary, settings.currency)}
+                      </span>
+                    </div>
+                  )}
+
+                  {item.paymentStructure === 'per_period' && (
+                    <div className="text-[11px] text-indigo-900 dark:text-indigo-200 flex justify-between items-center">
+                      <span>Formula: {item.periodsTaken} periods conducted × {formatCurrency(item.rateAmount, settings.currency)}/pd</span>
+                      <span className="font-black text-xs">
+                        = {formatCurrency(item.calculatedSalary, settings.currency)}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Leave Deduction Toggle (for monthly and semester) */}
+                  {(item.paymentStructure === 'monthly' || item.paymentStructure === 'semester') && (
+                    <div className="pt-1.5 border-t border-slate-200 dark:border-slate-700/80">
+                      <div className="flex items-center justify-between">
+                        <label
+                          htmlFor={`deduct-toggle-${item.type}-${item.id}`}
+                          className="flex items-center gap-2 cursor-pointer select-none text-[11px]"
+                        >
+                          <input
+                            type="checkbox"
+                            id={`deduct-toggle-${item.type}-${item.id}`}
+                            checked={item.deductLeaves}
+                            onChange={(e) =>
+                              setOverrideDeductLeaves({
+                                ...overrideDeductLeaves,
+                                [item.id]: e.target.checked,
+                              })
+                            }
+                            className="w-3.5 h-3.5 rounded text-purple-600 focus:ring-purple-500 cursor-pointer"
+                          />
+                          <span className="text-slate-700 dark:text-slate-300 font-medium">
+                            Deduct salary for leave ({item.leavesCount} days)
+                          </span>
+                        </label>
+
+                        <span className="text-[11px] font-bold">
+                          {item.deductLeaves ? (
+                            <span className="text-rose-600 dark:text-rose-400">
+                              -{formatCurrency(item.deductionAmount, settings.currency)}
+                            </span>
+                          ) : (
+                            <span className="text-emerald-600 dark:text-emerald-400 text-[10px]">
+                              No Deduction (Protected)
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                        {item.deductLeaves
+                          ? `Deducting ${item.leavesCount} days at ${formatCurrency(item.perDayRate, settings.currency)}/day`
+                          : 'Salary is not deducted for absences unless selected by teacher.'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Bottom Card Summary: Net Payable vs Paid vs Due */}
+              <div className="pt-2.5 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between text-xs">
+                <div>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">
+                    Net Salary
+                  </span>
+                  <span className="text-sm sm:text-base font-black text-purple-900 dark:text-purple-200">
+                    {formatCurrency(item.calculatedSalary, settings.currency)}
+                  </span>
+                </div>
+
+                <div className="text-right">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                      Paid: {formatCurrency(item.paidThisMonth, settings.currency)}
+                    </span>
+                    <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400">
+                      Due: {formatCurrency(item.dueAmount, settings.currency)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 

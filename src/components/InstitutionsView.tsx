@@ -76,6 +76,9 @@ export const InstitutionsView: React.FC = () => {
     workingDays: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
     paymentStructure: 'monthly',
     rateAmount: 35000,
+    semesterDurationMonths: 6,
+    semesterName: '1st Semester',
+    deductLeaveSalary: false,
     extraClassRate: 900,
     startDate: getTodayIso(),
     paymentCalendarSystem: 'BS',
@@ -160,6 +163,9 @@ export const InstitutionsView: React.FC = () => {
       workingDays: [...(inst.workingDays || [])],
       paymentStructure: inst.paymentStructure,
       rateAmount: inst.rateAmount,
+      semesterDurationMonths: inst.semesterDurationMonths || 6,
+      semesterName: inst.semesterName || '1st Semester',
+      deductLeaveSalary: inst.deductLeaveSalary ?? false,
       extraClassRate: inst.extraClassRate || 0,
       startDate: inst.startDate,
       endDate: inst.endDate || '',
@@ -428,7 +434,7 @@ export const InstitutionsView: React.FC = () => {
             const today = new Date();
             const currentMonthIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
 
-            // Calculate attendance periods this month
+            // Calculate attendance periods, days, hours, and leaves this month
             const instAttendance = attendance.filter(
               (a) => a.institutionId === inst.id && a.date.startsWith(currentMonthIso) && a.status === 'present'
             );
@@ -436,16 +442,40 @@ export const InstitutionsView: React.FC = () => {
               (sum, a) => sum + (a.periodsCount || 1),
               0
             );
+            const totalMinsThisMonth = instAttendance.reduce(
+              (sum, a) => sum + (a.actualDurationMinutes || a.durationMinutes || 0),
+              0
+            );
+            const totalHoursThisMonth = Number((totalMinsThisMonth / 60).toFixed(1));
+            const totalDaysTakenThisMonth = new Set(instAttendance.map((a) => a.date)).size;
+
+            const instLeaves = attendance.filter(
+              (a) => a.institutionId === inst.id && a.date.startsWith(currentMonthIso) && a.status === 'absent'
+            );
+            const totalLeavesThisMonth = instLeaves.length;
 
             // Calculate estimated salary earned
             let calculatedEarnings = 0;
-            if (inst.paymentStructure === 'monthly') {
-              calculatedEarnings = inst.rateAmount;
+            if (inst.paymentStructure === 'semester') {
+              const semMonths = inst.semesterDurationMonths || 6;
+              const monthlyAllocation = Math.round(inst.rateAmount / semMonths);
+              if (inst.deductLeaveSalary && totalLeavesThisMonth > 0) {
+                const perDay = Math.round(monthlyAllocation / 26);
+                calculatedEarnings = Math.max(0, monthlyAllocation - (totalLeavesThisMonth * perDay));
+              } else {
+                calculatedEarnings = monthlyAllocation;
+              }
+            } else if (inst.paymentStructure === 'monthly') {
+              if (inst.deductLeaveSalary && totalLeavesThisMonth > 0) {
+                const perDay = Math.round(inst.rateAmount / 26);
+                calculatedEarnings = Math.max(0, inst.rateAmount - (totalLeavesThisMonth * perDay));
+              } else {
+                calculatedEarnings = inst.rateAmount;
+              }
             } else if (inst.paymentStructure === 'per_period') {
               calculatedEarnings = totalPeriodsTakenThisMonth * inst.rateAmount;
             } else if (inst.paymentStructure === 'hourly') {
-              const totalMins = instAttendance.reduce((sum, a) => sum + a.durationMinutes, 0);
-              calculatedEarnings = Math.round((totalMins / 60) * inst.rateAmount);
+              calculatedEarnings = Math.round((totalMinsThisMonth / 60) * inst.rateAmount);
             }
 
             // Total salary already paid this month
@@ -592,30 +622,71 @@ export const InstitutionsView: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Current Month Earnings & Periods Summary */}
-                  <div className="mt-4 grid grid-cols-2 gap-3 p-3 rounded-xl bg-purple-50/60 dark:bg-purple-950/20 border border-purple-200/60 dark:border-purple-800/40 text-xs">
-                    <div>
-                      <span className="text-[10px] uppercase font-bold text-purple-700 dark:text-purple-300">
-                        Periods This Month
-                      </span>
-                      <p className="text-lg font-bold text-slate-900 dark:text-white mt-0.5">
-                        {totalPeriodsTakenThisMonth} periods
-                      </p>
-                      <span className="text-[10px] text-slate-500">
-                        {instAttendance.length} working days
-                      </span>
+                  {/* Current Month Earnings & Workload Summary */}
+                  <div className="mt-4 p-3 rounded-xl bg-purple-50/60 dark:bg-purple-950/20 border border-purple-200/60 dark:border-purple-800/40 text-xs space-y-2.5">
+                    {inst.paymentStructure === 'semester' && (
+                      <div className="flex items-center justify-between pb-2 border-b border-purple-200/40 dark:border-purple-900/40 text-[11px]">
+                        <span className="font-bold text-purple-700 dark:text-purple-300">
+                          {inst.semesterName || '1st Semester'} ({inst.semesterDurationMonths || 6} Months Fixed)
+                        </span>
+                        <span className="text-slate-500 dark:text-slate-400">
+                          Total: <strong>{formatCurrency(inst.rateAmount, settings.currency)}</strong> (~{formatCurrency(Math.round(inst.rateAmount / (inst.semesterDurationMonths || 6)), settings.currency)}/mo)
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-4 gap-2 text-center">
+                      <div className="p-1.5 rounded-lg bg-white/80 dark:bg-slate-800/80">
+                        <span className="text-[10px] uppercase font-bold text-slate-500">Days</span>
+                        <p className="text-sm font-extrabold text-slate-900 dark:text-white">
+                          {totalDaysTakenThisMonth}
+                        </p>
+                      </div>
+
+                      <div className="p-1.5 rounded-lg bg-white/80 dark:bg-slate-800/80">
+                        <span className="text-[10px] uppercase font-bold text-purple-600 dark:text-purple-400">Periods</span>
+                        <p className="text-sm font-extrabold text-purple-700 dark:text-purple-300">
+                          {totalPeriodsTakenThisMonth}
+                        </p>
+                      </div>
+
+                      <div className="p-1.5 rounded-lg bg-white/80 dark:bg-slate-800/80">
+                        <span className="text-[10px] uppercase font-bold text-indigo-600 dark:text-indigo-400">Hours</span>
+                        <p className="text-sm font-extrabold text-indigo-700 dark:text-indigo-300">
+                          {totalHoursThisMonth}h
+                        </p>
+                      </div>
+
+                      <div className="p-1.5 rounded-lg bg-white/80 dark:bg-slate-800/80">
+                        <span className="text-[10px] uppercase font-bold text-rose-500">Leaves</span>
+                        <p className="text-sm font-extrabold text-rose-600 dark:text-rose-400">
+                          {totalLeavesThisMonth}
+                        </p>
+                      </div>
                     </div>
 
-                    <div>
-                      <span className="text-[10px] uppercase font-bold text-purple-700 dark:text-purple-300">
-                        Earned vs Paid
-                      </span>
-                      <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
-                        {formatCurrency(calculatedEarnings, settings.currency)}
-                      </p>
-                      <span className="text-[10px] text-slate-500">
-                        Received: {formatCurrency(paidThisMonth, settings.currency)}
-                      </span>
+                    <div className="flex items-center justify-between pt-1 text-xs">
+                      <div>
+                        <span className="text-[10px] text-slate-500 block">
+                          Leave Policy: {inst.deductLeaveSalary ? (
+                            <strong className="text-rose-600 dark:text-rose-400">Salary Deducted</strong>
+                          ) : (
+                            <strong className="text-emerald-600 dark:text-emerald-400">No Deduction (Teacher Default)</strong>
+                          )}
+                        </span>
+                      </div>
+
+                      <div className="text-right">
+                        <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                          Earned This Month
+                        </span>
+                        <p className="text-base font-bold text-emerald-600 dark:text-emerald-400">
+                          {formatCurrency(calculatedEarnings, settings.currency)}
+                        </p>
+                        <span className="text-[10px] text-slate-400">
+                          Paid: {formatCurrency(paidThisMonth, settings.currency)}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -1045,6 +1116,7 @@ export const InstitutionsView: React.FC = () => {
                       className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                     >
                       <option value="monthly">Monthly Fixed Salary</option>
+                      <option value="semester">Semester-Wise (Fixed for 6 Mos / 1 Semester)</option>
                       <option value="per_period">Per Period Rate</option>
                       <option value="hourly">Hourly Rate</option>
                       <option value="custom">Custom Arrangement</option>
@@ -1053,7 +1125,9 @@ export const InstitutionsView: React.FC = () => {
 
                   <div>
                     <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      Rate / Salary ({settings.currency}) *
+                      {formData.paymentStructure === 'semester'
+                        ? `Semester Package (${settings.currency}) *`
+                        : `Rate / Salary (${settings.currency}) *`}
                     </label>
                     <input
                       type="number"
@@ -1140,6 +1214,95 @@ export const InstitutionsView: React.FC = () => {
                       className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                     />
                   </div>
+                </div>
+
+                {/* Semester Configuration if semester structure is chosen */}
+                {formData.paymentStructure === 'semester' && (
+                  <div className="p-3.5 rounded-xl bg-purple-100/60 dark:bg-purple-950/40 border border-purple-300 dark:border-purple-800 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-purple-950 dark:text-purple-200">
+                        Semester Contract Specifications (Fixed 6 Months / 1 Semester)
+                      </span>
+                      <span className="text-[11px] font-semibold text-purple-700 dark:text-purple-300">
+                        Monthly Equiv: ~{formatCurrency(Math.round((formData.rateAmount ?? 0) / (formData.semesterDurationMonths || 6)), settings.currency)} / mo
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          Semester Title / Label
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 1st Semester, Grade 11 Term 1"
+                          value={formData.semesterName || ''}
+                          onChange={(e) =>
+                            setFormData({ ...formData, semesterName: e.target.value })
+                          }
+                          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                            Semester Duration (Months)
+                          </label>
+                          <div className="flex items-center gap-1">
+                            {[4, 5, 6].map((m) => (
+                              <button
+                                key={m}
+                                type="button"
+                                onClick={() => setFormData({ ...formData, semesterDurationMonths: m })}
+                                className={`px-1.5 py-0.5 text-[10px] rounded font-bold ${
+                                  formData.semesterDurationMonths === m
+                                    ? 'bg-purple-600 text-white'
+                                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                                }`}
+                              >
+                                {m} Mos
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <input
+                          type="number"
+                          min={1}
+                          max={12}
+                          value={formData.semesterDurationMonths ?? 6}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              semesterDurationMonths: Math.max(1, Number(e.target.value)),
+                            })
+                          }
+                          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Leave Deduction Policy */}
+                <div className="p-3 rounded-xl bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 flex items-start gap-2.5">
+                  <input
+                    type="checkbox"
+                    id="inst_deductLeaveSalary"
+                    checked={formData.deductLeaveSalary ?? false}
+                    onChange={(e) =>
+                      setFormData({ ...formData, deductLeaveSalary: e.target.checked })
+                    }
+                    className="mt-1 rounded text-purple-600 focus:ring-purple-500 w-4 h-4 cursor-pointer"
+                  />
+                  <label htmlFor="inst_deductLeaveSalary" className="text-xs cursor-pointer select-none">
+                    <span className="font-bold text-slate-800 dark:text-slate-200 block">
+                      Deduct salary for teacher leaves / absences (Optional)
+                    </span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
+                      By default, colleges and monthly tuition salary is <strong>not deducted for leaves</strong> unless explicitly agreed upon with the teacher. When checked, unpaid leave days will be proportionally deducted during salary calculations.
+                    </span>
+                  </label>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">

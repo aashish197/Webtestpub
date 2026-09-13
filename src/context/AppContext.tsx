@@ -136,6 +136,15 @@ interface AppContextType {
   updateAttendance: (id: string, data: Partial<AttendanceRecord>) => void;
   deleteAttendance: (id: string) => void;
   batchMarkAttendanceToday: (status: AttendanceStatus) => void;
+  rescheduleTodayClass: (params: {
+    classId: string;
+    fromDate: string;
+    toDate: string;
+    newStartTime: string;
+    newEndTime: string;
+    newDurationMinutes: number;
+    reason?: string;
+  }) => void;
 
   payments: PaymentRecord[];
   recordPayment: (payment: Omit<PaymentRecord, 'id' | 'recordedAt'>) => void;
@@ -1136,6 +1145,74 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     });
   };
 
+  const rescheduleTodayClass = (params: {
+    classId: string;
+    fromDate: string;
+    toDate: string;
+    newStartTime: string;
+    newEndTime: string;
+    newDurationMinutes: number;
+    reason?: string;
+  }) => {
+    const { classId, fromDate, toDate, newStartTime, newEndTime, newDurationMinutes, reason } = params;
+    const targetClass = classes.find((c) => c.id === classId);
+    if (!targetClass) return;
+
+    let targetName = targetClass.title;
+    if (targetClass.type === 'home_tuition') {
+      const student = students.find((s) => s.id === targetClass.studentId);
+      if (student) targetName = student.name;
+      if (targetClass.groupName) targetName = targetClass.groupName;
+    } else if (targetClass.type === 'college') {
+      const inst = institutions.find((i) => i.id === targetClass.institutionId);
+      if (inst) {
+        targetName = targetClass.section ? `${inst.name} (${targetClass.section})` : inst.name;
+      }
+    }
+
+    // 1. Mark fromDate (today) attendance as 'rescheduled'
+    markAttendance({
+      date: fromDate,
+      classId,
+      type: targetClass.type,
+      studentId: targetClass.studentId,
+      institutionId: targetClass.institutionId,
+      targetName,
+      subject: targetClass.subject,
+      startTime: targetClass.startTime,
+      endTime: targetClass.endTime,
+      durationMinutes: targetClass.durationMinutes,
+      status: 'rescheduled',
+      isRescheduled: true,
+      rescheduledToDate: toDate,
+      rescheduledToTime: `${newStartTime} - ${newEndTime}`,
+      rescheduledReason: reason,
+      notes: `Rescheduled to ${toDate} (${newStartTime} - ${newEndTime})${reason ? `: ${reason}` : ''}`,
+    });
+
+    // 2. Add or update dateSpecificSchedule on the target class for toDate
+    const existingDateSpecifics = targetClass.dateSpecificSchedules || [];
+    const filteredSpecifics = existingDateSpecifics.filter((s) => s.date !== toDate);
+    const newOverride = {
+      id: `resched-${Date.now()}`,
+      date: toDate,
+      startTime: newStartTime,
+      endTime: newEndTime,
+      durationMinutes: newDurationMinutes,
+      note: `Rescheduled session from ${fromDate}${reason ? ` (${reason})` : ''}`,
+    };
+
+    updateClass(classId, {
+      dateSpecificSchedules: [...filteredSpecifics, newOverride],
+    });
+
+    showToast(
+      'Class Rescheduled',
+      'success',
+      `${targetName} rescheduled from ${fromDate} to ${toDate} (${newStartTime} - ${newEndTime})`
+    );
+  };
+
   // Payment Actions
   const recordPayment = (paymentData: Omit<PaymentRecord, 'id' | 'recordedAt'>) => {
     const remainingBalance = Math.max(0, paymentData.amountDue - paymentData.amountPaid);
@@ -1974,6 +2051,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         updateAttendance,
         deleteAttendance,
         batchMarkAttendanceToday,
+        rescheduleTodayClass,
 
         payments,
         recordPayment,

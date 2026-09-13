@@ -18,6 +18,11 @@ import {
   Users,
   X,
   FileSpreadsheet,
+  CalendarClock,
+  Check,
+  RotateCcw,
+  AlertCircle,
+  Phone,
 } from 'lucide-react';
 import { getAttendanceStatusBadge, formatTime, exportToCsv } from '../utils/formatters';
 import { formatDisplayDate, getTodayIso, NEPALI_MONTHS_EN, adToBs, getDayOfWeek } from '../utils/nepaliCalendar';
@@ -31,6 +36,7 @@ export const AttendanceView: React.FC = () => {
     updateAttendance,
     deleteAttendance,
     batchMarkAttendanceToday,
+    rescheduleTodayClass,
     classes,
     students,
     institutions,
@@ -47,6 +53,32 @@ export const AttendanceView: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingAttendance, setEditingAttendance] = useState<AttendanceRecord | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  // Reschedule Today's Class Modal State
+  const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false);
+  const [rescheduleTarget, setRescheduleTarget] = useState<(typeof todayClasses)[0] | null>(null);
+  const [rescheduleData, setRescheduleData] = useState({
+    toDate: (() => {
+      const d = new Date();
+      d.setDate(d.getDate() + 1);
+      return d.toISOString().split('T')[0];
+    })(),
+    startTime: '16:00',
+    endTime: '17:00',
+    durationMinutes: 60,
+    reason: 'Student called to reschedule session',
+  });
+
+  // Actual Teaching Time Adjuster Modal State
+  const [isAdjustTimeModalOpen, setIsAdjustTimeModalOpen] = useState(false);
+  const [adjustTimeTarget, setAdjustTimeTarget] = useState<(typeof todayClasses)[0] | null>(null);
+  const [adjustTimeData, setAdjustTimeData] = useState({
+    actualStartTime: '16:00',
+    actualEndTime: '17:30',
+    actualDurationMinutes: 90,
+    topicsCovered: '',
+    notes: '',
+  });
 
   const todayIso = getTodayIso();
 
@@ -168,6 +200,112 @@ export const AttendanceView: React.FC = () => {
     if (status === 'present') {
       confetti({ particleCount: 20, spread: 40 });
     }
+  };
+
+  // Open reschedule dialog for today's class
+  const handleOpenReschedule = (cls: (typeof todayClasses)[0]) => {
+    setRescheduleTarget(cls);
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowIso = tomorrow.toISOString().split('T')[0];
+
+    // Check if there's already an attendance record with reschedule info
+    const existingRec = attendance.find(
+      (a) => a.classId === cls.id && a.date === todayIso
+    );
+
+    setRescheduleData({
+      toDate: existingRec?.rescheduledToDate || tomorrowIso,
+      startTime: existingRec?.rescheduledToTime || cls.startTime,
+      endTime: cls.endTime,
+      durationMinutes: cls.durationMinutes,
+      reason: existingRec?.rescheduledReason || 'Student requested shift in schedule (flexible tuition)',
+    });
+    setIsRescheduleModalOpen(true);
+  };
+
+  const handleConfirmReschedule = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!rescheduleTarget) return;
+
+    rescheduleTodayClass({
+      classId: rescheduleTarget.id,
+      fromDate: todayIso,
+      toDate: rescheduleData.toDate,
+      newStartTime: rescheduleData.startTime,
+      newEndTime: rescheduleData.endTime,
+      newDurationMinutes: rescheduleData.durationMinutes,
+      reason: rescheduleData.reason,
+    });
+
+    setIsRescheduleModalOpen(false);
+    setRescheduleTarget(null);
+  };
+
+  // Open adjust actual teaching time dialog
+  const handleOpenAdjustTime = (cls: (typeof todayClasses)[0]) => {
+    setAdjustTimeTarget(cls);
+    const existingRec = attendance.find(
+      (a) => a.classId === cls.id && a.date === todayIso
+    );
+
+    setAdjustTimeData({
+      actualStartTime: existingRec?.actualStartTime || existingRec?.startTime || cls.startTime,
+      actualEndTime: existingRec?.actualEndTime || existingRec?.endTime || cls.endTime,
+      actualDurationMinutes:
+        existingRec?.actualDurationMinutes || existingRec?.durationMinutes || cls.durationMinutes,
+      topicsCovered: existingRec?.topicsCovered || '',
+      notes: existingRec?.notes || '',
+    });
+    setIsAdjustTimeModalOpen(true);
+  };
+
+  const handleSaveAdjustTime = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adjustTimeTarget) return;
+
+    let targetName = adjustTimeTarget.title;
+    const sec = (adjustTimeTarget as any).sectionName || adjustTimeTarget.section;
+    if (adjustTimeTarget.type === 'home_tuition') {
+      const student = students.find((s) => s.id === adjustTimeTarget.studentId);
+      if (student) targetName = student.name;
+      if (adjustTimeTarget.groupName) targetName = adjustTimeTarget.groupName;
+    } else if (adjustTimeTarget.type === 'college') {
+      const inst = institutions.find((i) => i.id === adjustTimeTarget.institutionId);
+      if (inst) targetName = sec ? `${inst.name} (${sec})` : inst.name;
+    }
+
+    markAttendance({
+      date: todayIso,
+      classId: adjustTimeTarget.id,
+      type: adjustTimeTarget.type,
+      studentId: adjustTimeTarget.studentId,
+      institutionId: adjustTimeTarget.institutionId,
+      targetName,
+      subject: adjustTimeTarget.subject,
+      startTime: adjustTimeData.actualStartTime,
+      endTime: adjustTimeData.actualEndTime,
+      durationMinutes: adjustTimeData.actualDurationMinutes,
+      actualStartTime: adjustTimeData.actualStartTime,
+      actualEndTime: adjustTimeData.actualEndTime,
+      actualDurationMinutes: adjustTimeData.actualDurationMinutes,
+      scheduledStartTime: adjustTimeTarget.startTime,
+      scheduledEndTime: adjustTimeTarget.endTime,
+      periodsCount: adjustTimeTarget.type === 'college' ? 1 : undefined,
+      section: sec,
+      sectionSlotId: (adjustTimeTarget as any).sectionSlotId,
+      status: 'present',
+      topicsCovered: adjustTimeData.topicsCovered,
+      notes:
+        adjustTimeData.notes ||
+        `Actual session conducted: ${adjustTimeData.actualDurationMinutes} mins (${(
+          adjustTimeData.actualDurationMinutes / 60
+        ).toFixed(1)} hrs)`,
+    });
+
+    confetti({ particleCount: 25, spread: 45 });
+    setIsAdjustTimeModalOpen(false);
+    setAdjustTimeTarget(null);
   };
 
   const handleExportCsv = () => {
@@ -299,40 +437,134 @@ export const AttendanceView: React.FC = () => {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-1.5 self-end sm:self-center">
+                  <div className="flex items-center gap-1.5 self-end sm:self-center flex-wrap">
                     {isMarked ? (
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`px-3 py-1 text-xs font-bold rounded-lg ${
-                            getAttendanceStatusBadge(record.status).badgeClass
-                          }`}
-                        >
-                          {record.status.toUpperCase()}
-                        </span>
-                        <button
-                          onClick={() => handleMarkClassToday(cls, record.status === 'present' ? 'absent' : 'present')}
-                          className="text-xs text-indigo-600 hover:underline font-semibold"
-                        >
-                          Change
-                        </button>
-                      </div>
+                      record.status === 'rescheduled' ? (
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                          <div className="flex items-center gap-1.5">
+                            <span className="px-2.5 py-1 text-xs font-bold rounded-lg bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-300 dark:border-amber-800 flex items-center gap-1">
+                              <CalendarClock className="w-3.5 h-3.5" />
+                              RESCHEDULED
+                            </span>
+                            {record.rescheduledToDate && (
+                              <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">
+                                to {formatDisplayDate(record.rescheduledToDate, settings.dateSystem)}{' '}
+                                {record.rescheduledToTime ? `at ${formatTime(record.rescheduledToTime, settings.timeFormat)}` : ''}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenReschedule(cls)}
+                              className="px-2 py-1 text-[11px] font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/50 rounded-md border border-amber-200 dark:border-amber-800"
+                            >
+                              Edit Reschedule
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleMarkClassToday(cls, 'present')}
+                              className="px-2 py-1 text-[11px] font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                            >
+                              Reset
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span
+                            className={`px-3 py-1 text-xs font-bold rounded-lg ${
+                              getAttendanceStatusBadge(record.status).badgeClass
+                            }`}
+                          >
+                            {record.status.toUpperCase()}
+                          </span>
+
+                          {record.status === 'present' && (
+                            <span className="text-[11px] text-slate-600 dark:text-slate-400 font-medium">
+                              {record.actualDurationMinutes
+                                ? `${(record.actualDurationMinutes / 60).toFixed(1)} hrs conducted`
+                                : `${(record.durationMinutes / 60).toFixed(1)} hrs`}
+                            </span>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => handleOpenAdjustTime(cls)}
+                            className="text-xs text-indigo-600 hover:underline font-semibold flex items-center gap-0.5"
+                            title="Adjust actual hours/time taught"
+                          >
+                            <Clock className="w-3 h-3" />
+                            Actual Time
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleOpenReschedule(cls)}
+                            className="text-xs text-amber-600 hover:underline font-semibold flex items-center gap-0.5"
+                            title="Reschedule to another day"
+                          >
+                            <CalendarClock className="w-3 h-3" />
+                            Reschedule
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleMarkClassToday(
+                                cls,
+                                record.status === 'present' ? 'absent' : 'present'
+                              )
+                            }
+                            className="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 underline"
+                          >
+                            Change
+                          </button>
+                        </div>
+                      )
                     ) : (
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <button
+                          type="button"
                           onClick={() => handleMarkClassToday(cls, 'present')}
-                          className="px-3 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs"
+                          className="px-3 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs flex items-center gap-1"
                         >
+                          <Check className="w-3.5 h-3.5" />
                           Present
                         </button>
+
                         <button
+                          type="button"
+                          onClick={() => handleOpenAdjustTime(cls)}
+                          className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 flex items-center gap-1"
+                          title="Record actual time started/ended and hours conducted (for hourly tuition or schedule variations)"
+                        >
+                          <Clock className="w-3.5 h-3.5" />
+                          Actual Time
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleOpenReschedule(cls)}
+                          className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 hover:bg-amber-100 dark:hover:bg-amber-900/60 flex items-center gap-1"
+                          title="Reschedule today's class to another date/time agreed with student"
+                        >
+                          <CalendarClock className="w-3.5 h-3.5" />
+                          Reschedule
+                        </button>
+
+                        <button
+                          type="button"
                           onClick={() => handleMarkClassToday(cls, 'absent')}
-                          className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-rose-200 dark:border-rose-800 text-rose-600 hover:bg-rose-50"
+                          className="px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-rose-200 dark:border-rose-800 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
                         >
                           Absent
                         </button>
+
                         <button
+                          type="button"
                           onClick={() => handleMarkClassToday(cls, 'cancelled')}
-                          className="px-2.5 py-1.5 text-xs font-medium rounded-lg text-slate-500 hover:bg-slate-100"
+                          className="px-2 py-1.5 text-xs font-medium rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
                         >
                           Cancelled
                         </button>
@@ -491,15 +723,42 @@ export const AttendanceView: React.FC = () => {
                       </td>
 
                       <td className="px-4 py-3 text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                        {formatTime(rec.startTime, settings.timeFormat)} -{' '}
-                        {formatTime(rec.endTime, settings.timeFormat)} ({rec.durationMinutes}m)
-                        {isCollege && rec.periodsCount ? ` • ${rec.periodsCount} pd` : ''}
+                        <div className="flex items-center gap-1">
+                          <span>
+                            {formatTime(rec.startTime, settings.timeFormat)} -{' '}
+                            {formatTime(rec.endTime, settings.timeFormat)} ({rec.durationMinutes}m)
+                          </span>
+                          {isCollege && rec.periodsCount ? (
+                            <span className="text-xs font-semibold text-purple-600 dark:text-purple-400">
+                              • {rec.periodsCount} pd
+                            </span>
+                          ) : null}
+                        </div>
+                        {rec.actualDurationMinutes && rec.actualDurationMinutes !== rec.durationMinutes && (
+                          <div className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 mt-0.5">
+                            Actual: {rec.actualStartTime ? `${formatTime(rec.actualStartTime, settings.timeFormat)} - ${formatTime(rec.actualEndTime, settings.timeFormat)} ` : ''}
+                            ({rec.actualDurationMinutes}m / {(rec.actualDurationMinutes / 60).toFixed(1)}h)
+                          </div>
+                        )}
                       </td>
 
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <span className={`px-2.5 py-1 text-[11px] font-bold rounded-lg ${badgeClass}`}>
-                          {label}
-                        </span>
+                        {rec.status === 'rescheduled' ? (
+                          <div>
+                            <span className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                              RESCHEDULED
+                            </span>
+                            {rec.rescheduledToDate && (
+                              <div className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 mt-0.5">
+                                Shifted to {formatDisplayDate(rec.rescheduledToDate, settings.dateSystem)}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className={`px-2.5 py-1 text-[11px] font-bold rounded-lg ${badgeClass}`}>
+                            {label}
+                          </span>
+                        )}
                       </td>
 
                       <td className="px-4 py-3 text-slate-600 dark:text-slate-300 max-w-xs truncate">
@@ -865,6 +1124,381 @@ export const AttendanceView: React.FC = () => {
                 Yes, Delete
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reschedule Today's Class Modal */}
+      {isRescheduleModalOpen && rescheduleTarget && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-lg w-full p-6 shadow-xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400">
+                  <CalendarClock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                    Reschedule Today's Class
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Tuition times are flexible — agree with student and move to any day
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setIsRescheduleModalOpen(false);
+                  setRescheduleTarget(null);
+                }}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Target Class Info Banner */}
+            <div className="p-3.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-slate-900 dark:text-white text-sm">
+                  {rescheduleTarget.title}
+                </span>
+                <span className="px-2 py-0.5 text-[10px] font-extrabold uppercase rounded bg-amber-200 dark:bg-amber-900 text-amber-800 dark:text-amber-200">
+                  {rescheduleTarget.type === 'home_tuition' ? 'Tuition' : 'College'}
+                </span>
+              </div>
+              <div className="text-xs text-amber-900 dark:text-amber-300 mt-1 flex flex-wrap gap-x-3">
+                <span>
+                  <strong>Originally Scheduled:</strong> Today ({formatDisplayDate(todayIso, settings.dateSystem)})
+                </span>
+                <span>
+                  <strong>Time:</strong> {formatTime(rescheduleTarget.startTime, settings.timeFormat)} - {formatTime(rescheduleTarget.endTime, settings.timeFormat)}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1.5">
+                Today will be marked as <strong className="text-amber-700 dark:text-amber-400">Rescheduled</strong> (not absent), and this class will automatically be placed into your schedule on the new date.
+              </p>
+            </div>
+
+            <form onSubmit={handleConfirmReschedule} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Reschedule To Date *
+                </label>
+                <input
+                  type="date"
+                  required
+                  min={todayIso}
+                  value={rescheduleData.toDate}
+                  onChange={(e) =>
+                    setRescheduleData({ ...rescheduleData, toDate: e.target.value })
+                  }
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
+                />
+                <span className="text-[11px] text-slate-500 mt-0.5 block">
+                  Target Date in Nepali BS:{' '}
+                  <strong className="text-indigo-600 dark:text-indigo-400">
+                    {formatDisplayDate(rescheduleData.toDate, 'BS', 'medium')}
+                  </strong>
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    New Start Time
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={rescheduleData.startTime}
+                    onChange={(e) =>
+                      setRescheduleData({ ...rescheduleData, startTime: e.target.value })
+                    }
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    New End Time
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={rescheduleData.endTime}
+                    onChange={(e) =>
+                      setRescheduleData({ ...rescheduleData, endTime: e.target.value })
+                    }
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Session Duration (Mins)
+                  </label>
+                  <div className="flex items-center gap-1">
+                    {[45, 60, 90, 120].map((mins) => (
+                      <button
+                        key={mins}
+                        type="button"
+                        onClick={() =>
+                          setRescheduleData({ ...rescheduleData, durationMinutes: mins })
+                        }
+                        className={`px-1.5 py-0.5 text-[10px] font-semibold rounded ${
+                          rescheduleData.durationMinutes === mins
+                            ? 'bg-amber-600 text-white'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
+                        }`}
+                      >
+                        {mins}m
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <input
+                  type="number"
+                  min={15}
+                  step={5}
+                  value={rescheduleData.durationMinutes}
+                  onChange={(e) =>
+                    setRescheduleData({
+                      ...rescheduleData,
+                      durationMinutes: Number(e.target.value),
+                    })
+                  }
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Reason for Rescheduling
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Student called asking to move to tomorrow"
+                  value={rescheduleData.reason}
+                  onChange={(e) =>
+                    setRescheduleData({ ...rescheduleData, reason: e.target.value })
+                  }
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
+                />
+
+                {/* Quick presets */}
+                <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                  {[
+                    'Student called to shift class',
+                    'Student exam preparation shift',
+                    'Tutor personal emergency',
+                    'Holiday / Festival adjustment',
+                  ].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setRescheduleData({ ...rescheduleData, reason: preset })}
+                      className="px-2 py-0.5 text-[10px] rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-amber-100 dark:hover:bg-amber-950/60"
+                    >
+                      + {preset}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsRescheduleModalOpen(false);
+                    setRescheduleTarget(null);
+                  }}
+                  className="px-4 py-2 text-xs font-semibold rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 text-xs font-bold rounded-xl bg-amber-600 hover:bg-amber-700 text-white shadow-xs flex items-center gap-1.5"
+                >
+                  <CalendarClock className="w-4 h-4" />
+                  Confirm Reschedule
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Adjust Actual Teaching Time Modal */}
+      {isAdjustTimeModalOpen && adjustTimeTarget && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-lg w-full p-6 shadow-xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                    Actual Teaching Time Conducted
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Record exact hours and minutes taught today (critical for hourly tuition pay)
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setIsAdjustTimeModalOpen(false);
+                  setAdjustTimeTarget(null);
+                }}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Target Class Info */}
+            <div className="p-3 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-900/50 text-xs">
+              <div className="flex items-center justify-between font-bold text-slate-900 dark:text-white">
+                <span>{adjustTimeTarget.title}</span>
+                <span className="text-indigo-600 dark:text-indigo-400">
+                  Scheduled: {formatTime(adjustTimeTarget.startTime, settings.timeFormat)} - {formatTime(adjustTimeTarget.endTime, settings.timeFormat)} ({adjustTimeTarget.durationMinutes}m)
+                </span>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveAdjustTime} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Actual Start Time
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={adjustTimeData.actualStartTime}
+                    onChange={(e) =>
+                      setAdjustTimeData({ ...adjustTimeData, actualStartTime: e.target.value })
+                    }
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Actual End Time
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={adjustTimeData.actualEndTime}
+                    onChange={(e) =>
+                      setAdjustTimeData({ ...adjustTimeData, actualEndTime: e.target.value })
+                    }
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Actual Duration Conducted (Minutes)
+                  </label>
+                  <div className="flex items-center gap-1">
+                    {[45, 60, 75, 90, 120].map((mins) => (
+                      <button
+                        key={mins}
+                        type="button"
+                        onClick={() =>
+                          setAdjustTimeData({ ...adjustTimeData, actualDurationMinutes: mins })
+                        }
+                        className={`px-1.5 py-0.5 text-[10px] font-semibold rounded ${
+                          adjustTimeData.actualDurationMinutes === mins
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
+                        }`}
+                      >
+                        {mins}m ({(mins / 60).toFixed(1)}h)
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min={10}
+                    step={5}
+                    required
+                    value={adjustTimeData.actualDurationMinutes}
+                    onChange={(e) =>
+                      setAdjustTimeData({
+                        ...adjustTimeData,
+                        actualDurationMinutes: Number(e.target.value),
+                      })
+                    }
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-semibold">
+                    = {(adjustTimeData.actualDurationMinutes / 60).toFixed(2)} hours
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Topics Covered
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Completed Chapter 4 problem set, practice exam questions"
+                  value={adjustTimeData.topicsCovered}
+                  onChange={(e) =>
+                    setAdjustTimeData({ ...adjustTimeData, topicsCovered: e.target.value })
+                  }
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Private Remarks
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Student requested an extra 30 mins to finish calculus derivates"
+                  value={adjustTimeData.notes}
+                  onChange={(e) =>
+                    setAdjustTimeData({ ...adjustTimeData, notes: e.target.value })
+                  }
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAdjustTimeModalOpen(false);
+                    setAdjustTimeTarget(null);
+                  }}
+                  className="px-4 py-2 text-xs font-semibold rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs flex items-center gap-1.5"
+                >
+                  <Check className="w-4 h-4" />
+                  Mark Present with Actual Time
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
