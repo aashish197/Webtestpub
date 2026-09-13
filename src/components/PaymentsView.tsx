@@ -101,7 +101,12 @@ export const PaymentsView: React.FC = () => {
         (p.receiptNumber && p.receiptNumber.toLowerCase().includes(q)) ||
         (p.referenceNote && p.referenceNote.toLowerCase().includes(q));
 
-      const matchType = typeFilter === 'ALL' || p.type === typeFilter;
+      const matchType =
+        typeFilter === 'ALL' ||
+        (typeFilter === 'tuition_fee' &&
+          (p.type === 'tuition_fee' || p.type === 'tuition' || (!p.institutionId && !!p.studentId))) ||
+        (typeFilter === 'college_salary' &&
+          (p.type === 'college_salary' || (!p.studentId && !!p.institutionId)));
       const matchStatus = statusFilter === 'ALL' || p.status === statusFilter;
 
       return matchSearch && matchType && matchStatus;
@@ -362,7 +367,7 @@ Thank you for your payment!`;
               ) : (
                 filteredPayments.map((p) => {
                   const { label, badgeClass } = getPaymentStatusBadge(p.status);
-                  const isTuition = p.type === 'tuition_fee';
+                  const isTuition = p.type === 'tuition_fee' || p.type === 'tuition' || (!p.institutionId && !!p.studentId);
 
                   return (
                     <tr
@@ -609,9 +614,12 @@ Thank you for your payment!`;
                     onChange={(e) => {
                       const inst = institutions.find((i) => i.id === e.target.value);
                       if (inst) {
-                        const calculatedFee = inst.paymentStructure === 'hourly'
-                          ? Math.round(((inst.periodDurationMinutes || 60) / 60) * inst.rateAmount)
-                          : inst.rateAmount;
+                        const calculatedFee =
+                          inst.paymentStructure === 'hourly'
+                            ? Math.round(((inst.periodDurationMinutes || 60) / 60) * inst.rateAmount)
+                            : inst.paymentStructure === 'semester'
+                            ? Math.round(inst.rateAmount / (inst.semesterDurationMonths || 6))
+                            : inst.rateAmount;
                         setFormData({
                           ...formData,
                           institutionId: inst.id,
@@ -619,9 +627,12 @@ Thank you for your payment!`;
                           amountDue: calculatedFee,
                           amountPaid: calculatedFee,
                           remainingBalance: 0,
-                          referenceNote: inst.paymentStructure === 'hourly'
-                            ? `Lecture salary (${inst.periodDurationMinutes || 60} mins @ ${formatCurrency(inst.rateAmount, settings.currency)}/hr)`
-                            : formData.referenceNote,
+                          referenceNote:
+                            inst.paymentStructure === 'hourly'
+                              ? `Lecture salary (${inst.periodDurationMinutes || 60} mins @ ${formatCurrency(inst.rateAmount, settings.currency)}/hr)`
+                              : inst.paymentStructure === 'semester'
+                              ? `Semester salary (${inst.semesterDurationMonths || 6} months @ ${formatCurrency(inst.rateAmount, settings.currency)}/sem)`
+                              : formData.referenceNote,
                         });
                       }
                     }}

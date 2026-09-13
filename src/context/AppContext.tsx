@@ -793,6 +793,112 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return () => unsubscribe();
   }, []);
 
+  // One-time entity fee reconciliation on initial mount
+  // Ensures any previously edited student/institution fees are strictly synchronized across classes and unpaid payments
+  useEffect(() => {
+    let classesChanged = false;
+    const reconciledClasses = classesRef.current.map((c) => {
+      if (c.type === 'home_tuition' && c.studentId) {
+        const st = studentsRef.current.find((s) => s.id === c.studentId);
+        if (st && (c.feeAmount !== st.feeAmount || c.feeStructure !== st.feeStructure)) {
+          classesChanged = true;
+          return { ...c, feeAmount: st.feeAmount, feeStructure: st.feeStructure };
+        }
+      } else if (c.type === 'college' && c.institutionId) {
+        const inst = institutionsRef.current.find((i) => i.id === c.institutionId);
+        if (
+          inst &&
+          (c.feeAmount !== inst.rateAmount ||
+            c.feeStructure !== inst.paymentStructure ||
+            c.semesterDurationMonths !== inst.semesterDurationMonths)
+        ) {
+          classesChanged = true;
+          return {
+            ...c,
+            feeAmount: inst.rateAmount,
+            feeStructure: inst.paymentStructure,
+            semesterDurationMonths: inst.semesterDurationMonths,
+            semesterName: inst.semesterName,
+          };
+        }
+      }
+      return c;
+    });
+
+    if (classesChanged) {
+      classesRef.current = reconciledClasses;
+      setClasses(reconciledClasses);
+      localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(reconciledClasses));
+    }
+
+    let paymentsChanged = false;
+    const today = new Date().toISOString().split('T')[0];
+    const reconciledPayments = paymentsRef.current.map((p) => {
+      if (p.status !== 'paid') {
+        if (p.studentId) {
+          const st = studentsRef.current.find((s) => s.id === p.studentId);
+          if (st) {
+            const expectedDue =
+              st.feeStructure === 'hourly'
+                ? Math.round(((st.classDurationMinutes || 60) / 60) * st.feeAmount)
+                : st.feeAmount;
+            if (p.amountDue !== expectedDue) {
+              paymentsChanged = true;
+              const rem = Math.max(0, expectedDue - p.amountPaid);
+              return {
+                ...p,
+                amountDue: expectedDue,
+                remainingBalance: rem,
+                status:
+                  rem === 0
+                    ? 'paid'
+                    : p.amountPaid > 0
+                    ? 'partially_paid'
+                    : p.dueDate && p.dueDate < today
+                    ? 'overdue'
+                    : 'pending',
+              };
+            }
+          }
+        } else if (p.institutionId) {
+          const inst = institutionsRef.current.find((i) => i.id === p.institutionId);
+          if (inst) {
+            let expectedDue = inst.rateAmount;
+            if (inst.paymentStructure === 'semester') {
+              expectedDue = Math.round(inst.rateAmount / (inst.semesterDurationMonths || 6));
+            } else if (inst.paymentStructure === 'hourly') {
+              expectedDue = Math.round(((inst.periodDurationMinutes || 60) / 60) * inst.rateAmount);
+            }
+            if (p.amountDue !== expectedDue) {
+              paymentsChanged = true;
+              const rem = Math.max(0, expectedDue - p.amountPaid);
+              return {
+                ...p,
+                amountDue: expectedDue,
+                remainingBalance: rem,
+                status:
+                  rem === 0
+                    ? 'paid'
+                    : p.amountPaid > 0
+                    ? 'partially_paid'
+                    : p.dueDate && p.dueDate < today
+                    ? 'overdue'
+                    : 'pending',
+              };
+            }
+          }
+        }
+      }
+      return p;
+    });
+
+    if (paymentsChanged) {
+      paymentsRef.current = reconciledPayments;
+      setPayments(reconciledPayments);
+      localStorage.setItem(STORAGE_KEYS.PAYMENTS, JSON.stringify(reconciledPayments));
+    }
+  }, []);
+
   // Auto-sync debounced changes when user is logged in
   useEffect(() => {
     if (!currentUser || isInitialLoadRef.current) return;
@@ -958,22 +1064,94 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const updateStudent = (id: string, data: Partial<Student>) => {
-    const updated = studentsRef.current.map(s => (s.id === id ? { ...s, ...data } : s));
+    const existingStudent = studentsRef.current.find((s) => s.id === id);
+    if (!existingStudent) return;
+
+    const mergedStudent = { ...existingStudent, ...data };
+    const updated = studentsRef.current.map((s) => (s.id === id ? mergedStudent : s));
     studentsRef.current = updated;
     setStudents(updated);
     localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(updated));
 
-    // Also update student names in classes/attendance if changed
-    if (data.name) {
-      const updatedClasses = classesRef.current.map(c => c.studentId === id ? { ...c, title: c.title.replace(s => s, data.name!) } : c);
-      classesRef.current = updatedClasses;
-      setClasses(updatedClasses);
-      localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(updatedClasses));
-      if (currentUserRef.current) {
-        syncDataToCloud({ students: updated, classes: updatedClasses });
+    // 1. Cascade updates to classes linked to this student
+    const updatedClasses = classesRef.current.map((c) => {
+      if (c.studentId === id || c.studentIds?.includes(id)) {
+        return sanitizeTeachingClass({
+          ...c,
+          title: data.name ? (c.studentId === id ? `${data.name} - ${c.subject || 'Tuition'}` : c.title.replace(existingStudent.name, data.name)) : c.title,
+          feeAmount: data.feeAmount !== undefined ? data.feeAmount : c.feeAmount,
+          feeStructure: data.feeStructure !== undefined ? data.feeStructure : c.feeStructure,
+          durationMinutes: data.classDurationMinutes !== undefined ? data.classDurationMinutes : c.durationMinutes,
+        });
       }
-    } else if (currentUserRef.current) {
-      syncDataToCloud({ students: updated });
+      return c;
+    });
+    classesRef.current = updatedClasses;
+    setClasses(updatedClasses);
+    localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(updatedClasses));
+
+    // 2. Cascade updates to pending / unpaid payments for this student
+    const today = new Date().toISOString().split('T')[0];
+    const updatedPayments = paymentsRef.current.map((p) => {
+      if (p.studentId === id && p.status !== 'paid') {
+        const effFee = data.feeAmount !== undefined ? data.feeAmount : existingStudent.feeAmount;
+        const effStructure = data.feeStructure !== undefined ? data.feeStructure : existingStudent.feeStructure;
+        const effDuration = data.classDurationMinutes !== undefined ? data.classDurationMinutes : (existingStudent.classDurationMinutes || 60);
+
+        const newAmountDue = effStructure === 'hourly'
+          ? Math.round((effDuration / 60) * effFee)
+          : effFee;
+
+        const newRemaining = Math.max(0, newAmountDue - p.amountPaid);
+        let newStatus: PaymentStatus = 'pending';
+        if (newRemaining === 0) {
+          newStatus = 'paid';
+        } else if (p.amountPaid > 0) {
+          newStatus = 'partially_paid';
+        } else if (p.dueDate && p.dueDate < today) {
+          newStatus = 'overdue';
+        }
+
+        return {
+          ...p,
+          amountDue: newAmountDue,
+          remainingBalance: newRemaining,
+          status: newStatus,
+          targetName: data.name || p.targetName,
+        };
+      } else if (p.studentId === id && data.name) {
+        return {
+          ...p,
+          targetName: data.name,
+        };
+      }
+      return p;
+    });
+    paymentsRef.current = updatedPayments;
+    setPayments(updatedPayments);
+    localStorage.setItem(STORAGE_KEYS.PAYMENTS, JSON.stringify(updatedPayments));
+
+    // 3. Cascade updates to attendance records if student name changed
+    let updatedAttendance = attendanceRef.current;
+    if (data.name) {
+      updatedAttendance = attendanceRef.current.map((a) => {
+        if (a.studentId === id) {
+          return { ...a, targetName: data.name! };
+        }
+        return a;
+      });
+      attendanceRef.current = updatedAttendance;
+      setAttendance(updatedAttendance);
+      localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(updatedAttendance));
+    }
+
+    if (currentUserRef.current) {
+      syncDataToCloud({
+        students: updated,
+        classes: updatedClasses,
+        payments: updatedPayments,
+        attendance: updatedAttendance,
+      });
     }
   };
 
@@ -1009,12 +1187,101 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const updateInstitution = (id: string, data: Partial<Institution>) => {
-    const updated = institutionsRef.current.map(i => (i.id === id ? sanitizeInstitution({ ...i, ...data }) : i));
+    const existingInst = institutionsRef.current.find((i) => i.id === id);
+    if (!existingInst) return;
+
+    const mergedInst = sanitizeInstitution({ ...existingInst, ...data });
+    const updated = institutionsRef.current.map((i) => (i.id === id ? mergedInst : i));
     institutionsRef.current = updated;
     setInstitutions(updated);
     localStorage.setItem(STORAGE_KEYS.INSTITUTIONS, JSON.stringify(updated));
+
+    // 1. Cascade updates to classes for this institution
+    const updatedClasses = classesRef.current.map((c) => {
+      if (c.institutionId === id) {
+        return sanitizeTeachingClass({
+          ...c,
+          title: data.name ? `${data.name} - ${c.subject || 'Class'}` : c.title,
+          feeAmount: data.rateAmount !== undefined ? data.rateAmount : c.feeAmount,
+          feeStructure: data.paymentStructure !== undefined ? data.paymentStructure : c.feeStructure,
+          durationMinutes: data.periodDurationMinutes !== undefined ? data.periodDurationMinutes : c.durationMinutes,
+          semesterDurationMonths: data.semesterDurationMonths !== undefined ? data.semesterDurationMonths : c.semesterDurationMonths,
+          semesterName: data.semesterName !== undefined ? data.semesterName : c.semesterName,
+        });
+      }
+      return c;
+    });
+    classesRef.current = updatedClasses;
+    setClasses(updatedClasses);
+    localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(updatedClasses));
+
+    // 2. Cascade updates to pending / unpaid payments for this college
+    const today = new Date().toISOString().split('T')[0];
+    const updatedPayments = paymentsRef.current.map((p) => {
+      if (p.institutionId === id && p.status !== 'paid') {
+        const effRate = data.rateAmount !== undefined ? data.rateAmount : existingInst.rateAmount;
+        const effStructure = data.paymentStructure !== undefined ? data.paymentStructure : existingInst.paymentStructure;
+        const effDuration = data.periodDurationMinutes !== undefined ? data.periodDurationMinutes : (existingInst.periodDurationMinutes || 60);
+        const effSemMonths = data.semesterDurationMonths !== undefined ? data.semesterDurationMonths : (existingInst.semesterDurationMonths || 6);
+
+        let newAmountDue = effRate;
+        if (effStructure === 'semester') {
+          newAmountDue = Math.round(effRate / effSemMonths);
+        } else if (effStructure === 'hourly') {
+          newAmountDue = Math.round((effDuration / 60) * effRate);
+        }
+
+        const newRemaining = Math.max(0, newAmountDue - p.amountPaid);
+        let newStatus: PaymentStatus = 'pending';
+        if (newRemaining === 0) {
+          newStatus = 'paid';
+        } else if (p.amountPaid > 0) {
+          newStatus = 'partially_paid';
+        } else if (p.dueDate && p.dueDate < today) {
+          newStatus = 'overdue';
+        }
+
+        return {
+          ...p,
+          amountDue: newAmountDue,
+          remainingBalance: newRemaining,
+          status: newStatus,
+          targetName: data.name ? `${data.name} (${existingInst.facultyOrGrade})` : p.targetName,
+        };
+      } else if (p.institutionId === id && data.name) {
+        return {
+          ...p,
+          targetName: `${data.name} (${existingInst.facultyOrGrade})`,
+        };
+      }
+      return p;
+    });
+    paymentsRef.current = updatedPayments;
+    setPayments(updatedPayments);
+    localStorage.setItem(STORAGE_KEYS.PAYMENTS, JSON.stringify(updatedPayments));
+
+    // 3. Cascade updates to attendance records if institution name changed
+    let updatedAttendance = attendanceRef.current;
+    if (data.name) {
+      updatedAttendance = attendanceRef.current.map((a) => {
+        if (a.institutionId === id) {
+          const sec = a.section ? ` (${a.section})` : '';
+          return { ...a, targetName: `${data.name}${sec}` };
+        }
+        return a;
+      });
+      attendanceRef.current = updatedAttendance;
+      setAttendance(updatedAttendance);
+      localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(updatedAttendance));
+    }
+
     if (currentUserRef.current) {
-      syncDataToCloud({ institutions: updated });
+      syncDataToCloud({
+        institutions: updated,
+        classes: updatedClasses,
+        payments: updatedPayments,
+        attendance: updatedAttendance,
+      });
     }
   };
 
@@ -1052,13 +1319,129 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const updateClass = (id: string, data: Partial<TeachingClass>) => {
-    const updated = classesRef.current.map(c => (c.id === id ? sanitizeTeachingClass({ ...c, ...data }) : c));
+    const existingClass = classesRef.current.find((c) => c.id === id);
+    if (!existingClass) return;
+
+    const updatedClass = sanitizeTeachingClass({ ...existingClass, ...data });
+    const updated = classesRef.current.map((c) => (c.id === id ? updatedClass : c));
     classesRef.current = updated;
     setClasses(updated);
     localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(updated));
 
+    // If tuition fee/structure was modified on class, synchronize with student profile & payments
+    let updatedStudents = studentsRef.current;
+    let updatedInstitutions = institutionsRef.current;
+    let updatedPayments = paymentsRef.current;
+
+    if (
+      updatedClass.type === 'home_tuition' &&
+      updatedClass.studentId &&
+      (data.feeAmount !== undefined || data.feeStructure !== undefined || data.durationMinutes !== undefined)
+    ) {
+      const st = studentsRef.current.find((s) => s.id === updatedClass.studentId);
+      if (st) {
+        updatedStudents = studentsRef.current.map((s) => {
+          if (s.id === updatedClass.studentId) {
+            return {
+              ...s,
+              feeAmount: data.feeAmount !== undefined ? data.feeAmount : s.feeAmount,
+              feeStructure: data.feeStructure !== undefined ? data.feeStructure : s.feeStructure,
+              classDurationMinutes: data.durationMinutes !== undefined ? data.durationMinutes : s.classDurationMinutes,
+            };
+          }
+          return s;
+        });
+        studentsRef.current = updatedStudents;
+        setStudents(updatedStudents);
+        localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(updatedStudents));
+
+        const today = new Date().toISOString().split('T')[0];
+        const effFee = data.feeAmount !== undefined ? data.feeAmount : st.feeAmount;
+        const effStructure = data.feeStructure !== undefined ? data.feeStructure : st.feeStructure;
+        const effDur = data.durationMinutes !== undefined ? data.durationMinutes : (st.classDurationMinutes || 60);
+        const expectedDue = effStructure === 'hourly' ? Math.round((effDur / 60) * effFee) : effFee;
+
+        updatedPayments = paymentsRef.current.map((p) => {
+          if (p.studentId === updatedClass.studentId && p.status !== 'paid') {
+            const rem = Math.max(0, expectedDue - p.amountPaid);
+            let pStatus: PaymentStatus =
+              rem === 0
+                ? 'paid'
+                : p.amountPaid > 0
+                ? 'partially_paid'
+                : p.dueDate && p.dueDate < today
+                ? 'overdue'
+                : 'pending';
+            return { ...p, amountDue: expectedDue, remainingBalance: rem, status: pStatus };
+          }
+          return p;
+        });
+        paymentsRef.current = updatedPayments;
+        setPayments(updatedPayments);
+        localStorage.setItem(STORAGE_KEYS.PAYMENTS, JSON.stringify(updatedPayments));
+      }
+    } else if (
+      updatedClass.type === 'college' &&
+      updatedClass.institutionId &&
+      (data.feeAmount !== undefined || data.feeStructure !== undefined || data.durationMinutes !== undefined)
+    ) {
+      const inst = institutionsRef.current.find((i) => i.id === updatedClass.institutionId);
+      if (inst) {
+        updatedInstitutions = institutionsRef.current.map((i) => {
+          if (i.id === updatedClass.institutionId) {
+            return sanitizeInstitution({
+              ...i,
+              rateAmount: data.feeAmount !== undefined ? data.feeAmount : i.rateAmount,
+              paymentStructure: data.feeStructure !== undefined ? data.feeStructure : i.paymentStructure,
+              periodDurationMinutes: data.durationMinutes !== undefined ? data.durationMinutes : i.periodDurationMinutes,
+            });
+          }
+          return i;
+        });
+        institutionsRef.current = updatedInstitutions;
+        setInstitutions(updatedInstitutions);
+        localStorage.setItem(STORAGE_KEYS.INSTITUTIONS, JSON.stringify(updatedInstitutions));
+
+        const today = new Date().toISOString().split('T')[0];
+        const effRate = data.feeAmount !== undefined ? data.feeAmount : inst.rateAmount;
+        const effStructure = data.feeStructure !== undefined ? data.feeStructure : inst.paymentStructure;
+        const effDur = data.durationMinutes !== undefined ? data.durationMinutes : (inst.periodDurationMinutes || 60);
+        const effSem = inst.semesterDurationMonths || 6;
+        let expectedDue = effRate;
+        if (effStructure === 'semester') {
+          expectedDue = Math.round(effRate / effSem);
+        } else if (effStructure === 'hourly') {
+          expectedDue = Math.round((effDur / 60) * effRate);
+        }
+
+        updatedPayments = paymentsRef.current.map((p) => {
+          if (p.institutionId === updatedClass.institutionId && p.status !== 'paid') {
+            const rem = Math.max(0, expectedDue - p.amountPaid);
+            let pStatus: PaymentStatus =
+              rem === 0
+                ? 'paid'
+                : p.amountPaid > 0
+                ? 'partially_paid'
+                : p.dueDate && p.dueDate < today
+                ? 'overdue'
+                : 'pending';
+            return { ...p, amountDue: expectedDue, remainingBalance: rem, status: pStatus };
+          }
+          return p;
+        });
+        paymentsRef.current = updatedPayments;
+        setPayments(updatedPayments);
+        localStorage.setItem(STORAGE_KEYS.PAYMENTS, JSON.stringify(updatedPayments));
+      }
+    }
+
     if (currentUserRef.current) {
-      syncDataToCloud({ classes: updated });
+      syncDataToCloud({
+        classes: updated,
+        students: updatedStudents,
+        institutions: updatedInstitutions,
+        payments: updatedPayments,
+      });
     }
   };
 
@@ -1440,7 +1823,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     let pending = 0;
 
     payments
-      .filter(p => p.type === 'tuition' && (p.periodMonthYear === currentMonthIso || p.paymentDate?.startsWith(currentMonthIso)))
+      .filter(p => (p.type === 'tuition' || p.type === 'tuition_fee' || (!p.institutionId && !!p.studentId)) && (p.periodMonthYear === currentMonthIso || p.paymentDate?.startsWith(currentMonthIso)))
       .forEach(p => {
         received += p.amountPaid;
         expected += p.amountDue;
@@ -1459,7 +1842,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     let pending = 0;
 
     payments
-      .filter(p => p.type === 'college_salary' && (p.periodMonthYear === currentMonthIso || p.paymentDate?.startsWith(currentMonthIso)))
+      .filter(p => (p.type === 'college_salary' || (!p.studentId && !!p.institutionId)) && (p.periodMonthYear === currentMonthIso || p.paymentDate?.startsWith(currentMonthIso)))
       .forEach(p => {
         received += p.amountPaid;
         earned += p.amountDue;

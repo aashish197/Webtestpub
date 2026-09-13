@@ -48,13 +48,17 @@ export const IncomeView: React.FC = () => {
 
   const totalTuitionCollected = useMemo(() => {
     return monthPayments
-      .filter((p) => p.type === 'tuition_fee' && p.amountPaid > 0)
+      .filter(
+        (p) =>
+          (p.type === 'tuition_fee' || p.type === 'tuition' || (!p.institutionId && !!p.studentId)) &&
+          p.amountPaid > 0
+      )
       .reduce((sum, p) => sum + p.amountPaid, 0);
   }, [monthPayments]);
 
   const totalCollegeSalaryCollected = useMemo(() => {
     return monthPayments
-      .filter((p) => p.type === 'college_salary' && p.amountPaid > 0)
+      .filter((p) => (p.type === 'college_salary' || (!p.studentId && !!p.institutionId)) && p.amountPaid > 0)
       .reduce((sum, p) => sum + p.amountPaid, 0);
   }, [monthPayments]);
 
@@ -73,7 +77,7 @@ export const IncomeView: React.FC = () => {
     });
 
     monthPayments
-      .filter((p) => p.type === 'tuition_fee' && p.studentId)
+      .filter((p) => (p.type === 'tuition_fee' || p.type === 'tuition' || (!p.institutionId && !!p.studentId)) && p.studentId)
       .forEach((p) => {
         if (map[p.studentId!]) {
           map[p.studentId!].paid += p.amountPaid;
@@ -95,14 +99,17 @@ export const IncomeView: React.FC = () => {
   const collegeBreakdown = useMemo(() => {
     const map: Record<string, { name: string; faculty: string; paid: number; due: number }> = {};
     institutions.forEach((i) => {
-      const defaultDue = i.paymentStructure === 'hourly'
-        ? Math.round(((i.periodDurationMinutes || 60) / 60) * i.rateAmount)
-        : i.rateAmount;
+      const defaultDue =
+        i.paymentStructure === 'hourly'
+          ? Math.round(((i.periodDurationMinutes || 60) / 60) * i.rateAmount)
+          : i.paymentStructure === 'semester'
+          ? Math.round(i.rateAmount / (i.semesterDurationMonths || 6))
+          : i.rateAmount;
       map[i.id] = { name: i.name, faculty: i.facultyOrGrade, paid: 0, due: defaultDue };
     });
 
     monthPayments
-      .filter((p) => p.type === 'college_salary' && p.institutionId)
+      .filter((p) => (p.type === 'college_salary' || (!p.studentId && !!p.institutionId)) && p.institutionId)
       .forEach((p) => {
         if (map[p.institutionId!]) {
           map[p.institutionId!].paid += p.amountPaid;

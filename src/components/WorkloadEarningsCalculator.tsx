@@ -290,23 +290,47 @@ export const WorkloadEarningsCalculator: React.FC = () => {
 
       dayClasses.forEach((cls) => {
         dayMins += cls.durationMinutes;
+
+        // Dynamically resolve authoritative fee & structure if student or college exists
+        let fee = cls.feeAmount;
+        let structure = cls.feeStructure;
+        let semMonths = cls.semesterDurationMonths || 6;
+
+        if (cls.type === 'home_tuition' && cls.studentId) {
+          const st = students.find((s) => s.id === cls.studentId);
+          if (st) {
+            fee = st.feeAmount;
+            structure = st.feeStructure;
+          }
+        } else if (cls.type === 'college' && cls.institutionId) {
+          const inst = institutions.find((i) => i.id === cls.institutionId);
+          if (inst) {
+            fee = inst.rateAmount;
+            structure = inst.paymentStructure;
+            semMonths = inst.semesterDurationMonths || 6;
+          }
+        }
+
         if (cls.type === 'home_tuition') {
-          if (cls.feeStructure === 'monthly') {
-            dayTuitionEst += cls.feeAmount / 24;
-          } else if (cls.feeStructure === 'hourly') {
-            dayTuitionEst += (cls.durationMinutes / 60) * cls.feeAmount;
+          if (structure === 'monthly') {
+            dayTuitionEst += fee / 24;
+          } else if (structure === 'hourly') {
+            dayTuitionEst += (cls.durationMinutes / 60) * fee;
           } else {
-            dayTuitionEst += cls.feeAmount;
+            dayTuitionEst += fee;
           }
         } else {
-          if (cls.feeStructure === 'monthly') {
-            dayCollegeEst += cls.feeAmount / 24;
-          } else if (cls.feeStructure === 'per_period') {
-            dayCollegeEst += cls.feeAmount;
-          } else if (cls.feeStructure === 'hourly') {
-            dayCollegeEst += (cls.durationMinutes / 60) * cls.feeAmount;
+          if (structure === 'semester') {
+            const monthlyNominal = fee / semMonths;
+            dayCollegeEst += monthlyNominal / 26;
+          } else if (structure === 'monthly') {
+            dayCollegeEst += fee / 24;
+          } else if (structure === 'per_period') {
+            dayCollegeEst += fee;
+          } else if (structure === 'hourly') {
+            dayCollegeEst += (cls.durationMinutes / 60) * fee;
           } else {
-            dayCollegeEst += cls.feeAmount;
+            dayCollegeEst += fee;
           }
         }
       });
@@ -594,14 +618,32 @@ export const WorkloadEarningsCalculator: React.FC = () => {
         (today.getFullYear() - startD.getFullYear()) * 12 + (today.getMonth() - startD.getMonth())
       );
 
+      let effectiveFeeAmount = c.feeAmount;
+      let effectiveFeeStructure = c.feeStructure;
+      if (c.type === 'home_tuition' && c.studentId) {
+        const st = students.find((s) => s.id === c.studentId);
+        if (st) {
+          effectiveFeeAmount = st.feeAmount;
+          effectiveFeeStructure = st.feeStructure;
+        }
+      } else if (c.type === 'college' && c.institutionId) {
+        const inst = institutions.find((i) => i.id === c.institutionId);
+        if (inst) {
+          effectiveFeeAmount = inst.rateAmount;
+          effectiveFeeStructure = inst.paymentStructure;
+        }
+      }
+
       return {
         ...c,
+        feeAmount: effectiveFeeAmount,
+        feeStructure: effectiveFeeStructure,
         effectiveStartDate: startDateStr,
         tenureMonths: diffMonths,
         tenureText: diffMonths === 0 ? 'Started this month' : `${diffMonths} month${diffMonths > 1 ? 's' : ''} ongoing`,
       };
     });
-  }, [classes]);
+  }, [classes, students, institutions]);
 
   return (
     <div className="space-y-8">
@@ -1429,27 +1471,52 @@ export const WorkloadEarningsCalculator: React.FC = () => {
           </div>
 
           {/* Mode Switcher */}
-          <div className="flex items-center rounded-xl bg-slate-100 dark:bg-slate-800 p-1">
+          <div className="flex flex-wrap items-center gap-2">
             <button
-              onClick={() => setCalculatorMode('hourly')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${
-                calculatorMode === 'hourly'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-              }`}
+              onClick={() => {
+                if (students.length > 0) {
+                  const avgFee = students.reduce((sum, s) => sum + s.feeAmount, 0) / students.length;
+                  setSimMonthlyPerStudent(Math.round(avgFee));
+                  setSimStudentsCount(students.length);
+                }
+                if (institutions.length > 0) {
+                  const avgSalary =
+                    institutions.reduce((sum, i) => {
+                      if (i.paymentStructure === 'semester') {
+                        return sum + Math.round(i.rateAmount / (i.semesterDurationMonths || 6));
+                      }
+                      return sum + i.rateAmount;
+                    }, 0) / institutions.length;
+                  setSimCollegeSalary(Math.round(avgSalary));
+                }
+              }}
+              className="px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition"
+              title="Populate simulator sliders with real student count, average tuition fees, and college salary"
             >
-              Hourly Rate Model
+              Sync Real Rates
             </button>
-            <button
-              onClick={() => setCalculatorMode('student_college')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${
-                calculatorMode === 'student_college'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-              }`}
-            >
-              Student + College Model
-            </button>
+            <div className="flex items-center rounded-xl bg-slate-100 dark:bg-slate-800 p-1">
+              <button
+                onClick={() => setCalculatorMode('hourly')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${
+                  calculatorMode === 'hourly'
+                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                }`}
+              >
+                Hourly Rate Model
+              </button>
+              <button
+                onClick={() => setCalculatorMode('student_college')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${
+                  calculatorMode === 'student_college'
+                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                }`}
+              >
+                Student + College Model
+              </button>
+            </div>
           </div>
         </div>
 
